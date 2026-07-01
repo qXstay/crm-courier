@@ -1,0 +1,204 @@
+<section class="topbar">
+  <div class="title-block">
+    <h1>Маршрут</h1>
+    <p>Заявки на {{ route_summary.route_date|ru_date }}. <span class="route-stat-hint">Нажмите на блок, чтобы открыть список.</span></p>
+  </div>
+</section>
+
+<section class="filters route-filter-panel" aria-label="Параметры маршрута">
+  <form class="filters-grid route-filters route-filters-date-first" method="get" action="/couriers">
+    <div class="field route-date-field">
+      <label for="route_date">Дата доставки</label>
+      <input id="route_date" name="date" type="date" value="{{ filters.date }}">
+    </div>
+    <div class="field route-courier-field">
+      <label for="courier_id">Курьер</label>
+      <select id="courier_id" name="courier_id">
+        <option value="all" {% if filters.courier_id == "all" %}selected{% endif %}>Все</option>
+        {% for courier in couriers %}
+          <option value="{{ courier.id }}" {% if filters.courier_id == courier.id|string %}selected{% endif %}>
+            {{ courier.full_name }}
+          </option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="route-filter-submit">
+      <button class="primary-btn" type="submit">Показать</button>
+    </div>
+  </form>
+</section>
+
+<section class="route-stat-layout" aria-label="Статистика маршрута">
+  <div class="route-stat-list">
+    <a class="route-stat-row {% if filters.detail == 'couriers' %}active{% endif %}" href="{{ detail_links.couriers }}">
+      <span class="route-stat-label">Курьеры</span>
+      <strong>{{ route_summary.couriers_count }}</strong>
+      <span class="route-stat-note">С заявками</span>
+    </a>
+    <a class="route-stat-row {% if filters.detail == 'all' %}active{% endif %}" href="{{ detail_links.all }}">
+      <span class="route-stat-label">Всего заявок</span>
+      <strong>{{ route_summary.orders_count }}</strong>
+      <span class="route-stat-note">За дату</span>
+    </a>
+    <a class="route-stat-row {% if filters.detail == 'in_work' %}active{% endif %}" href="{{ detail_links.in_work }}">
+      <span class="route-stat-label">В работе</span>
+      <strong>{{ route_summary.in_work_count }}</strong>
+      <span class="route-stat-note">Ожидают доставки</span>
+    </a>
+    <a class="route-stat-row {% if filters.detail == 'at_courier' %}active{% endif %}" href="{{ detail_links.at_courier }}">
+      <span class="route-stat-label">У курьера</span>
+      <strong>{{ route_summary.at_courier_count }}</strong>
+      <span class="route-stat-note">В пути</span>
+    </a>
+    <a class="route-stat-row {% if filters.detail == 'delivered' %}active{% endif %}" href="{{ detail_links.delivered }}">
+      <span class="route-stat-label">Доставлено</span>
+      <strong>{{ route_summary.delivered_count }}</strong>
+      <span class="route-stat-note">Завершено</span>
+    </a>
+  </div>
+
+  {% if can_view_route_money %}
+    <div class="route-money-list" aria-label="Деньги маршрута">
+      <div class="route-money-row">
+        <span>Выручка</span>
+        <strong>{{ route_summary.delivery_total|money }}</strong>
+      </div>
+      <div class="route-money-row">
+        <span>ЗП курьера</span>
+        <strong>{{ route_summary.courier_pay_total|money }}</strong>
+      </div>
+    </div>
+  {% endif %}
+</section>
+
+{% if not filters.detail %}
+  <div class="empty-note">Нажмите строку статистики, чтобы увидеть список.</div>
+{% elif filters.detail == "couriers" %}
+  <section class="route-results" aria-label="Курьеры с заявками">
+    <div class="section-head route-results-head">
+      <h2>{{ route_summary.detail_title }}</h2>
+      <p>{{ route_summary.route_date|ru_date }}.</p>
+    </div>
+
+    {% if route_summary.detail_couriers %}
+      <div class="route-courier-list">
+        {% for item in route_summary.detail_couriers %}
+          <article class="route-courier-row">
+            <div class="route-courier-main">
+              <div class="courier-avatar" aria-hidden="true">{{ item.courier.full_name[:1] }}</div>
+              <div>
+                <h3>{{ item.courier.full_name }}</h3>
+                <div class="subtle">{{ item.courier.phone|phone("Телефон не указан") }}</div>
+              </div>
+            </div>
+            <div class="route-courier-stats">
+              <span>Заявок: <strong>{{ item.orders_count }}</strong></span>
+              <span>В работе: <strong>{{ item.in_work_count }}</strong></span>
+              <span>У курьера: <strong>{{ item.at_courier_count }}</strong></span>
+              <span>Доставлено: <strong>{{ item.delivered_count }}</strong></span>
+            </div>
+            <a class="action-link route-open-link" href="/couriers/{{ item.courier.id }}/route?date={{ route_summary.route_date.isoformat() }}">Выбрать</a>
+          </article>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="empty-note">На эту дату курьеров с заявками нет.</div>
+    {% endif %}
+  </section>
+{% else %}
+  <section class="route-results" aria-label="Заявки маршрута">
+    <div class="section-head route-results-head">
+      <h2>{{ route_summary.detail_title }}</h2>
+      <p>
+        {{ route_summary.route_date|ru_date }}.
+        {% if route_summary.courier %}{{ route_summary.courier.full_name }}.{% else %}Все курьеры.{% endif %}
+      </p>
+    </div>
+
+    {% if route_summary.detail_orders %}
+      <div class="table-wrap route-results-table">
+        <table class="route-table">
+          <thead>
+            <tr>
+              <th>Номер</th>
+              <th>Клиент</th>
+              <th>Телефон</th>
+              <th>Курьер</th>
+              <th>Адрес</th>
+              <th>Статус</th>
+              {% if can_view_route_money %}
+                <th>Выручка</th>
+                <th>ЗП курьера</th>
+              {% endif %}
+              <th>Действие</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for order in route_summary.detail_orders %}
+              <tr>
+                <td>
+                  <span class="num">{{ order.order_code }}</span>
+                  {% if order.cargo_number %}<div class="cargo-line"><span class="cargo-pill">{{ order.cargo_number }}</span></div>{% endif %}
+                </td>
+                <td><div class="client">{{ order.client_name_snapshot }}</div></td>
+                <td><div class="subtle nowrap">{{ order.client_phone_snapshot|phone }}</div></td>
+                <td><div class="courier-name-cell">{{ order.courier.full_name if order.courier else "Не назначен" }}</div></td>
+                <td><div class="address">{{ order.address }}</div></td>
+                <td><span class="status {{ order.status|status_class }}">{{ order.status|status_label }}</span></td>
+                {% if can_view_route_money %}
+                  <td><span class="amount">{{ order.delivery_cost|money }}</span></td>
+                  <td><span class="amount">{{ order.courier_pay|money }}</span></td>
+                {% endif %}
+                <td><a class="action-link" href="/orders/{{ order.id }}">Открыть</a></td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="cards route-result-cards" aria-label="Заявки">
+        {% for order in route_summary.detail_orders %}
+          <article class="route-card">
+            <div class="card-top">
+              <div>
+                <div class="card-number">{{ order.order_code }}</div>
+                {% if order.cargo_number %}<div class="cargo-line"><span class="cargo-pill cargo-pill-strong">{{ order.cargo_number }}</span></div>{% endif %}
+                <div class="card-client">{{ order.client_name_snapshot }}</div>
+              </div>
+              <span class="status {{ order.status|status_class }}">{{ order.status|status_label }}</span>
+            </div>
+            <div class="card-grid">
+              <div>
+                <div class="meta-label">Телефон</div>
+                <div class="meta-value">{{ order.client_phone_snapshot|phone }}</div>
+              </div>
+              <div>
+                <div class="meta-label">Курьер</div>
+                <div class="meta-value">{{ order.courier.full_name if order.courier else "Не назначен" }}</div>
+              </div>
+              <div>
+                <div class="meta-label">Адрес</div>
+                <div class="meta-value route-card-address">{{ order.address }}</div>
+              </div>
+              {% if can_view_route_money %}
+                <div>
+                  <div class="meta-label">Выручка</div>
+                  <div class="meta-value amount">{{ order.delivery_cost|money }}</div>
+                </div>
+                <div>
+                  <div class="meta-label">ЗП курьера</div>
+                  <div class="meta-value amount">{{ order.courier_pay|money }}</div>
+                </div>
+              {% endif %}
+            </div>
+            <div class="card-actions">
+              <a class="card-btn" href="/orders/{{ order.id }}">Открыть</a>
+            </div>
+          </article>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="empty-note">По этому фильтру заявок нет.</div>
+    {% endif %}
+  </section>
+{% endif %}

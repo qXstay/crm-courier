@@ -1,0 +1,294 @@
+{% extends "base.html" %}
+
+{% block title %}Заявка {{ order.order_code }}{% endblock %}
+
+{% block content %}
+{% set orders_back_url = return_url or ('/archive' if order.is_archived else '/orders') %}
+<section class="page-head">
+  <div class="title-block">
+    <div class="crumbs">
+      <a href="/orders">Заявки</a>
+      <span>•</span>
+      <span>{{ order.order_code }}</span>
+    </div>
+    <div class="title-row">
+      <h1>Заявка {{ order.order_code }}</h1>
+      <span class="status {{ order.status|status_class }}">{{ order.status|status_label }}</span>
+      <span class="status {{ payment_status_class(payment_status) }}">{{ payment_status_label(payment_status) }}</span>
+    </div>
+    {% if (order.client and order.client.notes) or order.general_note %}
+      <div class="order-notes-summary" aria-label="Примечания">
+        {% if order.client and order.client.notes %}
+          <div class="order-note-item">
+            <div class="label">Заметка клиента</div>
+            <div class="value">{{ order.client.notes }}</div>
+          </div>
+        {% endif %}
+        {% if order.general_note %}
+          <div class="order-note-item">
+            <div class="label">Примечание к заявке</div>
+            <div class="value">{{ order.general_note }}</div>
+          </div>
+        {% endif %}
+      </div>
+    {% endif %}
+    <p class="head-note">{{ order.client_name_snapshot }} · {{ order.client_phone_snapshot }}</p>
+  </div>
+  <div class="head-actions">
+    <a class="btn" href="{{ orders_back_url }}">К списку</a>
+    {% if order.is_archived %}
+      {% if user.role.value == "admin" %}
+        <form method="post" action="/orders/{{ order.id }}/restore">
+          <button class="btn btn-primary" type="submit">Восстановить</button>
+        </form>
+      {% endif %}
+    {% else %}
+      <a class="btn btn-primary" href="/orders/{{ order.id }}/edit{% if return_url %}?return_url={{ return_url|urlencode }}{% endif %}">Изменить</a>
+      <form method="post" action="/orders/{{ order.id }}/archive" data-cancel-order-form>
+        <button class="btn" type="submit">Отменить заявку</button>
+      </form>
+    {% endif %}
+  </div>
+</section>
+
+{% if not order.is_archived %}
+  <div class="crm-modal" data-cancel-order-modal hidden aria-hidden="true">
+    <div class="crm-modal-backdrop" data-cancel-order-close></div>
+    <section class="crm-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="cancel-order-title" aria-describedby="cancel-order-description" tabindex="-1">
+      <div class="crm-modal-head">
+        <h2 id="cancel-order-title">Отменить заявку?</h2>
+      </div>
+      <p id="cancel-order-description">Заявка попадёт в архив. Восстановить сможет админ.</p>
+      <div class="crm-modal-actions">
+        <button class="btn" type="button" data-cancel-order-close>Не отменять</button>
+        <button class="danger-btn" type="button" data-cancel-order-confirm>Отменить заявку</button>
+      </div>
+    </section>
+  </div>
+{% endif %}
+
+{% if order.is_archived %}
+  <div class="archive-banner">Заявка в архиве</div>
+{% endif %}
+
+{% if payment_error %}
+  <div class="alert alert-danger">{{ payment_error }}</div>
+{% endif %}
+
+<div class="layout">
+  <div class="stack">
+    <section class="panel section">
+      <div class="section-head">
+        <h2>Доставка</h2>
+      </div>
+      <div class="data-grid">
+        <div class="data-item">
+          <div class="label">Клиент</div>
+          <div class="value">{{ order.client_name_snapshot }}</div>
+        </div>
+        <div class="data-item">
+          <div class="label">Телефон клиента</div>
+          <div class="value">{{ order.client_phone_snapshot }}</div>
+        </div>
+        <div class="data-item wide">
+          <div class="label">Адрес доставки</div>
+          <div class="value">{{ order.address }}</div>
+        </div>
+        <div class="data-item">
+          <div class="label">Дата доставки</div>
+          <div class="value">{{ order.delivery_date|ru_date }}</div>
+        </div>
+        <div class="data-item">
+          <div class="label">Создана</div>
+          <div class="value">{{ order.created_at|ru_datetime }}</div>
+          <div class="subtle">{{ order.created_by.full_name if order.created_by else "Система" }}</div>
+        </div>
+        <div class="data-item">
+          <div class="label">Курьер</div>
+          <div class="value">{{ order.courier.full_name if order.courier else "Не назначен" }}</div>
+        </div>
+        {% if order.is_archived %}
+          <div class="data-item">
+            <div class="label">Отменил</div>
+            <div class="value">{{ order.archived_by.full_name if order.archived_by else "Не указан" }}</div>
+            <div class="subtle">{{ order.archived_at|ru_datetime }}</div>
+          </div>
+        {% endif %}
+      </div>
+    </section>
+
+    <section class="panel section">
+      <div class="section-head">
+        <h2>Груз</h2>
+      </div>
+      <div class="data-grid">
+        <div class="data-item">
+          <div class="label">Номер груза</div>
+          <div class="value">{{ order.cargo_number or "Не указан" }}</div>
+        </div>
+        <div class="data-item">
+          <div class="label">Телефон карго</div>
+          <div class="value">{{ order.cargo_phone or "Не указан" }}</div>
+        </div>
+        <div class="data-item">
+          <div class="label">Вес</div>
+          <div class="value">{{ order.weight|order_number }}</div>
+        </div>
+        <div class="data-item">
+          <div class="label">Объём</div>
+          <div class="value">{{ order.volume|order_number }}</div>
+        </div>
+        <div class="data-item">
+          <div class="label">Кол-во мест</div>
+          <div class="value">{{ order.places_count if order.places_count is not none else "Не указано" }}</div>
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <aside class="aside">
+    <section class="panel cost-card">
+      <h2>Стоимость</h2>
+      <div class="cost-list">
+        <div class="cost-row"><span>Базовая доставка</span><strong>{{ order.base_delivery_cost|money }}</strong></div>
+        <div class="cost-row"><span>Куб</span><strong>{{ order.market_cube_cost|money }}</strong></div>
+        <div class="cost-row"><span>Грузчик</span><strong>{{ order.market_loader_cost|money }}</strong></div>
+        <div class="cost-row"><span>Хранение</span><strong>{{ order.market_storage_cost|money }}</strong></div>
+        <div class="cost-row"><span>Кара</span><strong>{{ order.market_kara_cost|money }}</strong></div>
+        <div class="cost-row"><span>Прочие</span><strong>{{ order.market_other_cost|money }}</strong></div>
+        <div class="cost-row"><span>Курьер</span><strong>{{ order.courier_pay|money }}</strong></div>
+      </div>
+      <div class="total-box">
+        <div class="total-label">Стоимость для клиента</div>
+        <div class="total-value">{{ order.delivery_cost|money }}</div>
+        <div class="total-note">Курьер не входит в стоимость клиента.</div>
+      </div>
+    </section>
+
+    <section class="panel section">
+      <div class="section-head">
+        <h2>Оплаты</h2>
+      </div>
+      <div class="history-list">
+        {% for payment in payments %}
+          <div class="payment-note">
+            <div class="payment-note-body">
+              <div class="value">{{ payment.amount|money }}</div>
+              <div class="subtle">Способ: {{ payment_method_label(payment.method) }}</div>
+              <div class="subtle">Дата оплаты: {{ payment.paid_at|ru_datetime }}</div>
+              <div class="subtle">Провёл: {{ payment.created_by.full_name if payment.created_by else "Система" }}</div>
+            </div>
+            {% if user.role.value == "admin" and not order.is_archived %}
+              <div class="payment-admin-actions">
+                <details class="payment-edit">
+                  <summary>Изменить</summary>
+                  <form class="payment-edit-form" method="post" action="/payments/{{ payment.id }}/edit">
+                    <input type="hidden" name="order_id" value="{{ order.id }}">
+                    <input type="hidden" name="redirect_to" value="/orders/{{ order.id }}">
+                    <div class="field">
+                      <label for="payment-amount-{{ payment.id }}">Сумма</label>
+                      <input id="payment-amount-{{ payment.id }}" name="amount" inputmode="decimal" value="{{ payment.amount|order_number }}">
+                    </div>
+                    <div class="field">
+                      <label for="payment-method-{{ payment.id }}">Способ</label>
+                      <select id="payment-method-{{ payment.id }}" name="method">
+                        {% for method in payment_methods %}
+                          <option value="{{ method.value }}" {% if payment.method.value == method.value %}selected{% endif %}>{{ payment_method_label(method) }}</option>
+                        {% endfor %}
+                      </select>
+                    </div>
+                    <button class="primary-btn" type="submit">Сохранить</button>
+                  </form>
+                </details>
+                <form method="post" action="/payments/{{ payment.id }}/delete">
+                  <input type="hidden" name="redirect_to" value="/orders/{{ order.id }}">
+                  <button class="danger-btn payment-delete" type="submit">Удалить</button>
+                </form>
+              </div>
+            {% endif %}
+          </div>
+        {% else %}
+          <div class="subtle">Оплат пока нет</div>
+        {% endfor %}
+      </div>
+    </section>
+
+    <section class="panel section">
+      <details class="log-details">
+        <summary>
+          <span>
+            <span class="log-title">Лог заявки</span>
+            <span class="subtle">История изменений</span>
+          </span>
+          <span class="log-count">{{ logs|length }}</span>
+        </summary>
+        <div class="history-list">
+          {% for log in logs %}
+            <div class="note-box">
+              <div class="label">{{ log.created_at|ru_datetime }}</div>
+              <div class="value">{{ log|log_summary }}</div>
+              <div class="subtle">{{ log.user.full_name if log.user else "Система" }}</div>
+            </div>
+          {% else %}
+            <div class="subtle">Изменений пока нет</div>
+          {% endfor %}
+        </div>
+      </details>
+    </section>
+  </aside>
+</div>
+
+{% if not order.is_archived %}
+<script>
+  (() => {
+    const form = document.querySelector('[data-cancel-order-form]');
+    const modal = document.querySelector('[data-cancel-order-modal]');
+    const dialog = modal?.querySelector('.crm-modal-dialog');
+    const confirmButton = modal?.querySelector('[data-cancel-order-confirm]');
+    const closeButtons = Array.from(document.querySelectorAll('[data-cancel-order-close]'));
+    let lastFocus = null;
+
+    if (!form || !modal || !dialog || !confirmButton) return;
+
+    const openModal = () => {
+      lastFocus = document.activeElement;
+      modal.hidden = false;
+      modal.setAttribute('aria-hidden', 'false');
+      document.body.classList.add('modal-open');
+      dialog.focus();
+    };
+
+    const closeModal = () => {
+      modal.hidden = true;
+      modal.setAttribute('aria-hidden', 'true');
+      document.body.classList.remove('modal-open');
+      if (lastFocus && typeof lastFocus.focus === 'function') {
+        lastFocus.focus();
+      }
+    };
+
+    form.addEventListener('submit', (event) => {
+      if (form.dataset.confirmed === 'true') return;
+      event.preventDefault();
+      openModal();
+    });
+
+    closeButtons.forEach((button) => {
+      button.addEventListener('click', closeModal);
+    });
+
+    confirmButton.addEventListener('click', () => {
+      form.dataset.confirmed = 'true';
+      form.requestSubmit();
+    });
+
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && !modal.hidden) {
+        closeModal();
+      }
+    });
+  })();
+</script>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+
+{% block title %}Заявка {{ order.order_code }}{% endblock %}
+
+{% block content %}
+<section class="page-head">
+  <div class="title-block">
+    <div class="crumbs">
+      <a href="/courier">Мои заявки</a>
+      <span>•</span>
+      <span>{{ order.order_code }}</span>
+    </div>
+    <div class="title-row">
+      <h1>Заявка {{ order.order_code }}</h1>
+      <span class="status {{ order.status|status_class }}" data-courier-order-status>{{ order.status|status_label }}</span>
+    </div>
+    <p class="head-note">{{ order.client_name_snapshot }} · {{ order.client_phone_snapshot|phone }}</p>
+  </div>
+  <div class="head-actions">
+    <a class="btn" href="/courier">К списку</a>
+    {% if order.status.value == "in_work" %}
+      <form method="post" action="/courier/orders/{{ order.id }}/at-courier">
+        <button class="btn btn-primary" type="submit">У курьера</button>
+      </form>
+    {% elif order.status.value == "at_courier" %}
+      <form method="post" action="/courier/orders/{{ order.id }}/delivered" data-courier-delivered-form>
+        <button class="btn btn-primary" type="submit">Доставлено</button>
+      </form>
+    {% endif %}
+  </div>
+</section>
+
+<div class="layout">
+  <div class="stack">
+    <section class="panel section">
+      <div class="section-head">
+        <h2>Доставка</h2>
+      </div>
+      <div class="data-grid">
+        <div class="data-item">
+          <div class="label">Клиент</div>
+          <div class="value">{{ order.client_name_snapshot }}</div>
+        </div>
+        <div class="data-item">
+          <div class="label">Телефон клиента</div>
+          <div class="value">{{ order.client_phone_snapshot|phone }}</div>
+        </div>
+        <div class="data-item wide">
+          <div class="label">Адрес доставки</div>
+          <div class="value">{{ order.address }}</div>
+        </div>
+        <div class="data-item">
+          <div class="label">Дата доставки</div>
+          <div class="value">{{ order.delivery_date|ru_date }}</div>
+        </div>
+        <div class="data-item">
+          <div class="label">Номер груза</div>
+          <div class="value"><span class="cargo-pill cargo-pill-large">{{ order.cargo_number or "Не указан" }}</span></div>
+        </div>
+        <div class="data-item">
+          <div class="label">Телефон карго</div>
+          <div class="value">{{ order.cargo_phone|phone }}</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel section">
+      <div class="section-head">
+        <h2>Для курьера</h2>
+      </div>
+      <div class="stack">
+        <div class="note-box">
+          <div class="label">Примечание</div>
+          <div class="value">{{ order.staff_note or "Нет примечания" }}</div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <aside class="aside">
+    <section class="panel cost-card">
+      <h2>Суммы</h2>
+      <div class="total-box">
+        <div class="total-label">Выручка</div>
+        <div class="total-value">{{ order.delivery_cost|money }}</div>
+      </div>
+      <div class="total-box total-box-plain">
+        <div class="total-label">ЗП курьера</div>
+        <div class="total-value">{{ order.courier_pay|money }}</div>
+      </div>
+    </section>
+  </aside>
+</div>
+
+<script>
+  (() => {
+    const form = document.querySelector('[data-courier-delivered-form]');
+    const statusBadge = document.querySelector('[data-courier-order-status]');
+    if (!form || !statusBadge || !window.fetch) return;
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const button = form.querySelector('button');
+      if (button) button.disabled = true;
+      try {
+        const response = await fetch(form.action, {
+          method: 'POST',
+          headers: { 'X-Requested-With': 'fetch' }
+        });
+        const result = await response.json();
+        if (!response.ok || !result.ok) {
+          throw new Error(result.message || 'Не удалось сохранить. Проверьте данные.');
+        }
+        statusBadge.className = `status ${result.status_class}`;
+        statusBadge.textContent = result.status_label;
+        form.remove();
+      } catch (error) {
+        HTMLFormElement.prototype.submit.call(form);
+      }
+    });
+  })();
+</script>
+{% endblock %}

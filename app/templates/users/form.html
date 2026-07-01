@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+
+{% block title %}{% if is_edit %}Редактирование сотрудника{% else %}Создание сотрудника{% endif %}{% endblock %}
+
+{% macro value(name, fallback="") -%}{{ values.get(name) if values.get(name) is not none else fallback }}{%- endmacro %}
+
+{% block content %}
+<section class="page-head">
+  <div class="title-block">
+    <div class="crumbs">
+      <a href="/users">Сотрудники</a>
+      <span>•</span>
+      <span>{% if is_edit %}Редактирование{% else %}Создание{% endif %}</span>
+    </div>
+    <h1>{% if is_edit %}Редактирование сотрудника{% else %}Создание сотрудника{% endif %}</h1>
+    <p>Роль определяет доступ к разделам CRM.</p>
+  </div>
+</section>
+
+{% if error %}
+  <div class="alert alert-danger">{{ error }}</div>
+{% endif %}
+
+<form class="panel section user-form" method="post" action="{% if is_edit %}/users/{{ edited_user.id }}/edit{% else %}/users{% endif %}">
+  <div class="grid">
+    <div class="field col-6">
+      <label for="full_name">ФИО *</label>
+      <input id="full_name" name="full_name" value="{{ value('full_name', edited_user.full_name if edited_user else '') }}" placeholder="Введите ФИО">
+    </div>
+    <div class="field col-6">
+      <label for="email">Логин *</label>
+      <input id="email" name="email" type="text" value="{{ value('email', edited_user.email if edited_user else '') }}" placeholder="manager1" autocomplete="username" {% if is_edit %}disabled{% endif %}>
+    </div>
+    <div class="field col-4">
+      <label for="phone">Телефон</label>
+      <input id="phone" name="phone" type="tel" value="{{ value('phone', edited_user.phone if edited_user else '') }}" placeholder="+375291234567">
+    </div>
+    <div class="field col-4">
+      <label for="role">Роль</label>
+      <select id="role" name="role">
+        {% for role in roles %}
+          {% set selected_role = value('role', edited_user.role.value if edited_user else 'manager') %}
+          <option value="{{ role.value }}" {% if selected_role == role.value %}selected{% endif %}>{{ role_label(role) }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="field col-4">
+      <label for="password">{% if is_edit %}Новый пароль{% else %}Пароль *{% endif %}</label>
+      <div class="password-input-group">
+        <input id="password" name="password" type="password" autocomplete="{% if is_edit %}new-password{% else %}new-password{% endif %}" placeholder="{% if is_edit %}Оставьте пустым, если не менять{% else %}Введите пароль{% endif %}">
+        <button class="btn password-toggle" type="button" data-password-toggle="password" aria-label="Показать пароль" aria-pressed="false">Показать</button>
+      </div>
+    </div>
+    <div class="field col-12">
+      {% set active_value = value('is_active', 'on' if not edited_user or edited_user.is_active else '') %}
+      <label class="check-row">
+        <input type="checkbox" name="is_active" value="on" {% if active_value %}checked{% endif %}>
+        <span>Активен</span>
+      </label>
+    </div>
+  </div>
+
+  <div class="form-actions">
+    <button class="btn btn-primary" type="submit">{% if is_edit %}Сохранить{% else %}Создать{% endif %}</button>
+    <a class="btn" href="/users">Отмена</a>
+  </div>
+</form>
+
+<script>
+  document.querySelectorAll("[data-password-toggle]").forEach((button) => {
+    const input = document.getElementById(button.dataset.passwordToggle);
+    if (!input) return;
+
+    button.addEventListener("click", () => {
+      const shouldShow = input.type === "password";
+      input.type = shouldShow ? "text" : "password";
+      button.textContent = shouldShow ? "Скрыть" : "Показать";
+      button.setAttribute("aria-label", shouldShow ? "Скрыть пароль" : "Показать пароль");
+      button.setAttribute("aria-pressed", String(shouldShow));
+    });
+  });
+</script>
+{% endblock %}

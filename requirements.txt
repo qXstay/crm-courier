@@ -1,0 +1,12 @@
+fastapi[standard]==0.115.6
+starlette==0.41.3
+uvicorn[standard]
+jinja2
+SQLAlchemy>=2.0,<3.0
+psycopg[binary]
+python-dotenv
+passlib[bcrypt]
+bcrypt==4.0.1
+itsdangerous
+python-multipart
+httpx

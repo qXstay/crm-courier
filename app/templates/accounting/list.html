@@ -1,0 +1,257 @@
+{% extends "base.html" %}
+
+{% block title %}Бухгалтерия{% endblock %}
+{% block wrap_class %} work-page-wrap{% endblock %}
+
+{% block content %}
+<section class="topbar">
+  <div class="title-block">
+    <h1>Бухгалтерия</h1>
+    <p>Выберите день или месяц, дату и нажмите «Показать».</p>
+  </div>
+</section>
+
+<section class="accounting-handover-entry" aria-label="Сдачи курьеров">
+  <div class="handover-entry-content">
+    <div class="handover-entry-badge">Контроль кассы</div>
+    <div>
+      <h2>Сдачи курьеров</h2>
+      <p>Проверьте суммы, которые курьеры передали в офис.</p>
+    </div>
+  </div>
+  <a class="primary-btn handover-entry-action" href="/accounting/handovers">Открыть сдачи</a>
+</section>
+
+<form class="filters" method="get" action="/accounting">
+  <div class="filters-grid accounting-filters">
+    <div class="field">
+      <span class="period-label">Период</span>
+      <div class="period-control" role="group" aria-label="Период">
+        {% for option in period_options %}
+          <label class="period-option {% if filters.period == option %}active{% endif %}">
+            <input type="radio" name="period" value="{{ option }}" {% if filters.period == option %}checked{% endif %}>
+            <span>{{ period_label(option) }}</span>
+          </label>
+        {% endfor %}
+      </div>
+    </div>
+    <div class="field">
+      <label for="report_date">Дата</label>
+      <input id="report_date" type="date" name="report_date" value="{{ filters.report_date }}">
+    </div>
+    <button class="secondary-btn" type="submit">Показать</button>
+  </div>
+</form>
+
+<section class="summary accounting-summary" aria-label="Сводка">
+  <div class="summary-card">
+    <div class="summary-label">Заявок</div>
+    <div class="summary-value">{{ report.summary.orders_count }}</div>
+  </div>
+  <div class="summary-card">
+    <div class="summary-label">Выручка</div>
+    <div class="summary-value">{{ report.summary.orders_total|money }}</div>
+  </div>
+  <div class="summary-card">
+    <div class="summary-label">Оплачено</div>
+    <div class="summary-value">{{ report.summary.paid_total|money }}</div>
+  </div>
+  <div class="summary-card">
+    <div class="summary-label">Не оплачено</div>
+    <div class="summary-value">{{ report.summary.pending_total|money }}</div>
+  </div>
+  <div class="summary-card">
+    <div class="summary-label">Расходы</div>
+    <div class="summary-value">{{ report.summary.market_expenses_total|money }}</div>
+  </div>
+  <div class="summary-card">
+    <div class="summary-label">ЗП курьера</div>
+    <div class="summary-value">{{ report.summary.courier_pay_total|money }}</div>
+  </div>
+  <div class="summary-card">
+    <div class="summary-label">Прибыль</div>
+    <div class="summary-value profit">{{ report.summary.profit_total|money }}</div>
+  </div>
+</section>
+
+<div class="layout accounting-layout">
+  <section class="panel section">
+    <div class="section-head">
+      <h2>{{ period_label(report.period) }}</h2>
+      <p>{{ period_caption(report) }}</p>
+    </div>
+
+    {% if rows %}
+      <div class="table-wrap" aria-label="Заявки бухгалтерии">
+        <table class="accounting-table">
+          <thead>
+            <tr>
+              <th>Номер</th>
+              <th>Клиент</th>
+              <th>Дата</th>
+              <th>Выручка</th>
+              <th>Оплачено</th>
+              <th>Расходы</th>
+              <th>ЗП курьера</th>
+              <th>Прибыль</th>
+              <th>Статус оплаты</th>
+              <th>Действие</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in rows %}
+              <tr>
+                <td><span class="num">{{ row.order.order_code }}</span></td>
+                <td>
+                  <div class="client">{{ row.order.client_name_snapshot }}</div>
+                  <div class="subtle accounting-client-phone">{{ row.order.client_phone_snapshot|phone }}</div>
+                </td>
+                <td>{{ row.order.delivery_date|ru_date }}</td>
+                <td><span class="amount">{{ row.order.delivery_cost|money }}</span></td>
+                <td><span class="amount">{{ row.paid_amount|money }}</span></td>
+                <td><span class="amount negative">{{ row.market_expenses|money }}</span></td>
+                <td><span class="amount">{{ row.courier_pay|money }}</span></td>
+                <td><span class="amount profit">{{ row.profit|money }}</span></td>
+                <td>
+                  <span class="status {{ payment_status_class(row.payment_status) }}">
+                    {{ payment_status_label(row.payment_status) }}
+                  </span>
+                </td>
+                <td>
+                  <a class="action-link" href="/orders/{{ row.order.id }}">Открыть</a>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <section class="cards" aria-label="Заявки бухгалтерии">
+        {% for row in rows %}
+          <article class="order-card accounting-card">
+            <div class="card-top">
+              <div>
+                <div class="card-number">{{ row.order.order_code }}</div>
+                <div class="card-client">{{ row.order.client_name_snapshot }}</div>
+              </div>
+              <span class="status {{ payment_status_class(row.payment_status) }}">
+                {{ payment_status_label(row.payment_status) }}
+              </span>
+            </div>
+            <div class="card-grid">
+              <div>
+                <div class="meta-label">Дата</div>
+                <div class="meta-value">{{ row.order.delivery_date|ru_date }}</div>
+              </div>
+              <div>
+                <div class="meta-label">Выручка</div>
+                <div class="meta-value amount">{{ row.order.delivery_cost|money }}</div>
+              </div>
+              <div>
+                <div class="meta-label">Оплачено</div>
+                <div class="meta-value amount">{{ row.paid_amount|money }}</div>
+              </div>
+              <div>
+                <div class="meta-label">Не оплачено</div>
+                <div class="meta-value amount">{{ row.pending_amount|money }}</div>
+              </div>
+              <div>
+                <div class="meta-label">Расходы</div>
+                <div class="meta-value amount negative">{{ row.market_expenses|money }}</div>
+              </div>
+              <div>
+                <div class="meta-label">ЗП курьера</div>
+                <div class="meta-value amount">{{ row.courier_pay|money }}</div>
+              </div>
+              <div>
+                <div class="meta-label">Прибыль</div>
+                <div class="meta-value amount profit">{{ row.profit|money }}</div>
+              </div>
+            </div>
+            <div class="card-actions">
+              <a class="card-btn" href="/orders/{{ row.order.id }}">Открыть</a>
+            </div>
+          </article>
+        {% endfor %}
+      </section>
+    {% else %}
+      <div class="empty-note">Заявок за период нет.</div>
+    {% endif %}
+  </section>
+
+  <aside class="aside accounting-aside" aria-label="Итоги">
+    <section class="panel section">
+      <div class="section-head">
+        <h2>Итого</h2>
+      </div>
+      <div class="fact">
+        <span class="fact-name">Оплачено</span>
+        <span class="fact-value">{{ report.summary.paid_total|money }}</span>
+      </div>
+      <div class="fact">
+        <span class="fact-name">Не оплачено</span>
+        <span class="fact-value">{{ report.summary.pending_total|money }}</span>
+      </div>
+      <div class="fact">
+        <span class="fact-name">Расходы</span>
+        <span class="fact-value">{{ report.summary.market_expenses_total|money }}</span>
+      </div>
+      <div class="fact">
+        <span class="fact-name">ЗП курьера</span>
+        <span class="fact-value">{{ report.summary.courier_pay_total|money }}</span>
+      </div>
+      <div class="fact">
+        <span class="fact-name">Прибыль</span>
+        <span class="fact-value profit">{{ report.summary.profit_total|money }}</span>
+      </div>
+    </section>
+
+    <section class="panel section">
+      <div class="section-head">
+        <h2>Расходы</h2>
+      </div>
+      <div class="expenses-grid">
+        <div class="expense-row">
+          <span class="expense-name">Куб</span>
+          <span class="expense-value">{{ report.expenses.cube|money }}</span>
+        </div>
+        <div class="expense-row">
+          <span class="expense-name">Грузчик</span>
+          <span class="expense-value">{{ report.expenses.loader|money }}</span>
+        </div>
+        <div class="expense-row">
+          <span class="expense-name">Хранение</span>
+          <span class="expense-value">{{ report.expenses.storage|money }}</span>
+        </div>
+        <div class="expense-row">
+          <span class="expense-name">Кара</span>
+          <span class="expense-value">{{ report.expenses.kara|money }}</span>
+        </div>
+        <div class="expense-row">
+          <span class="expense-name">Прочие</span>
+          <span class="expense-value">{{ report.expenses.other|money }}</span>
+        </div>
+      </div>
+    </section>
+  </aside>
+</div>
+
+<script>
+  const accountingPeriodOptions = Array.from(document.querySelectorAll(".period-option"));
+
+  const syncAccountingPeriodState = () => {
+    accountingPeriodOptions.forEach((option) => {
+      const input = option.querySelector('input[type="radio"]');
+      option.classList.toggle("active", Boolean(input && input.checked));
+    });
+  };
+
+  accountingPeriodOptions.forEach((option) => {
+    const input = option.querySelector('input[type="radio"]');
+    if (input) {
+      input.addEventListener("change", syncAccountingPeriodState);
+    }
+  });
+  syncAccountingPeriodState();
+</script>
+{% endblock %}

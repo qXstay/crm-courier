@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+
+{% block title %}Кабинет курьера{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between gap-3">
+  <div>
+    <h1 class="h3 mb-1">Кабинет курьера</h1>
+    <p class="text-secondary mb-0">{{ user.full_name }}</p>
+  </div>
+  <form method="post" action="/logout">
+    <button class="btn btn-outline-secondary" type="submit">Выйти</button>
+  </form>
+</div>
+{% endblock %}

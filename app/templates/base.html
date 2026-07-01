@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="icon" type="image/svg+xml" href="/static/img/favicon.svg">
+    <link rel="stylesheet" href="/static/css/app.css">
+    <title>{% block title %}Courier CRM{% endblock %}</title>
+  </head>
+  <body>
+    {% set is_signed_in = user is defined and user %}
+    {% if is_signed_in and user.role.value == "courier" %}
+      {% set nav_items = [
+        ("courier", "Заявки", "/courier", true)
+      ] %}
+    {% elif is_signed_in and user.role.value == "admin" %}
+      {% set nav_items = [
+        ("orders", "Заявки", "/orders", true),
+        ("clients", "Клиенты", "/clients", true),
+        ("route", "Маршрут", "/couriers", true),
+        ("payments", "Оплата", "/payments", true),
+        ("accounting", "Бухгалтерия", "/accounting", true),
+        ("users", "Сотрудники", "/users", true),
+        ("archive", "Архив", "/archive", true)
+      ] %}
+    {% else %}
+      {% set nav_items = [
+        ("orders", "Заявки", "/orders", true),
+        ("clients", "Клиенты", "/clients", true),
+        ("route", "Маршрут", "/couriers", true),
+        ("payments", "Оплата", "/payments", true)
+      ] %}
+    {% endif %}
+
+    {% if is_signed_in %}
+      <div class="app">
+        <aside class="sidebar" aria-label="Боковая навигация">
+          <div class="brand">
+            <div class="brand-mark">
+              <img src="/static/img/crm-courier-logo.webp" alt="Logo">
+            </div>
+            <div>
+              <div class="brand-title">Courier CRM</div>
+              <div class="brand-sub">Рабочий кабинет</div>
+            </div>
+          </div>
+
+          <nav class="nav">
+            {% for key, label, href, enabled in nav_items %}
+              {% if enabled %}
+                <a href="{{ href }}" class="{% if nav_section == key %}active{% endif %}">
+                  <span class="nav-dot"></span>{{ label }}
+                </a>
+              {% else %}
+                <span class="nav-disabled"><span class="nav-dot"></span>{{ label }}</span>
+              {% endif %}
+            {% endfor %}
+          </nav>
+
+          <form class="logout-form" method="post" action="/logout">
+            <button class="secondary-btn w-100" type="submit">Выйти</button>
+          </form>
+        </aside>
+
+        <main class="main">
+          <div class="wrap{% block wrap_class %}{% endblock %}">
+            {% if user.role.value in ["admin", "manager"] %}
+              <form class="mobile-account-logout" method="post" action="/logout">
+                <button type="submit">Выйти</button>
+              </form>
+            {% endif %}
+    {% else %}
+      <main class="auth-main">
+    {% endif %}
+
+    {% block content %}{% endblock %}
+
+    {% if is_signed_in %}
+          </div>
+        </main>
+      </div>
+
+      <nav class="bottom-nav" aria-label="Нижняя навигация">
+        <ul>
+          {% for key, label, href, enabled in nav_items %}
+            <li>
+              {% if enabled %}
+                <a href="{{ href }}" class="{% if nav_section == key %}active{% endif %}">
+                  <span class="icon"></span><span>{{ label }}</span>
+                </a>
+              {% else %}
+                <span class="bottom-disabled"><span class="icon"></span><span>{{ label }}</span></span>
+              {% endif %}
+            </li>
+          {% endfor %}
+        </ul>
+      </nav>
+      <script>
+        document.querySelectorAll('input[type="date"]').forEach((input) => {
+          input.addEventListener("click", () => {
+            if (typeof input.showPicker !== "function") return;
+            try {
+              input.showPicker();
+            } catch (error) {
+              // Браузер сам откроет календарь или оставит обычный ввод.
+            }
+          });
+        });
+      </script>
+    {% else %}
+      </main>
+    {% endif %}
+  </body>
+</html>

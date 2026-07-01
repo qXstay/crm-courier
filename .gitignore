@@ -1,0 +1,46 @@
+# Окружение и секреты
+.env
+.env.*
+!.env.example
+.codex
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Базы и дампы
+*.sqlite
+*.sqlite-*
+*.db
+*.dump
+
+# Open Design и агентские артефакты
+.od/
+.od-skills/
+*.artifact.json
+.claude/
+.agents/
+
+# Node и сборка
+node_modules/
+dist/
+build/
+
+# Приватные артефакты подготовки демо
+qa_artifacts/
+static-preview/
+docs/customer_feedback/
+docs/source/
+
+# Тестовые скриншоты и сессии
+.playwright-mcp/
+
+# OS
+.DS_Store
+.venv-local/
+*.sqlite3

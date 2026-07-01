@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+
+{% block title %}Недостаточно прав{% endblock %}
+
+{% block content %}
+<section class="error-page" aria-labelledby="error-title">
+  <div class="error-card">
+    <div class="error-code">403</div>
+    <h1 id="error-title">Недостаточно прав</h1>
+    <p>Этот раздел недоступен для вашей роли.</p>
+    <a class="primary-btn" href="{{ action_href }}">{{ action_label }}</a>
+  </div>
+</section>
+{% endblock %}

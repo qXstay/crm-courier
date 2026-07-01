@@ -1,0 +1,329 @@
+{% extends "base.html" %}
+
+{% block title %}Оплата{% endblock %}
+{% block wrap_class %} work-page-wrap payments-page-wrap{% endblock %}
+
+{% block content %}
+<section class="topbar">
+  <div class="title-block">
+    <h1>Оплата</h1>
+    <p>Активные заявки без архива. Оплату проводят менеджер и админ.</p>
+  </div>
+</section>
+
+{% if error %}
+  <div class="alert alert-danger">{{ error }}</div>
+{% endif %}
+
+<form class="filters" method="get" action="/payments" data-payment-filter-form>
+  <div class="filters-grid payments-filters">
+    <div class="field">
+      <label for="q">Поиск</label>
+      <input id="q" name="q" value="{{ filters.q }}" placeholder="Номер, клиент или телефон" autocomplete="off" data-payment-filter-input>
+    </div>
+    <div class="field">
+      <label for="delivery_date">Дата доставки</label>
+      <input id="delivery_date" type="date" name="delivery_date" value="{{ filters.delivery_date }}">
+    </div>
+    <div class="field">
+      <label for="payment_status">Статус оплаты</label>
+      <select id="payment_status" name="payment_status">
+        <option value="">Все</option>
+        {% for status in payment_statuses %}
+          <option value="{{ status.value }}" {% if filters.payment_status == status.value %}selected{% endif %}>
+            {{ payment_status_label(status) }}
+          </option>
+        {% endfor %}
+      </select>
+    </div>
+    <input type="hidden" name="detail" value="">
+    <input type="hidden" name="view" value="">
+    <button class="secondary-btn" type="submit">Показать</button>
+  </div>
+  <div class="payment-quick-actions">
+    <a class="secondary-btn payment-unpaid-link" href="/payments?view=unpaid">Неоплаченные заявки</a>
+  </div>
+</form>
+
+{% if success %}
+  <div class="payment-success-alert" role="status">
+    <div class="payment-success-text">Оплата проведена. Заявка ушла из неоплаченных.</div>
+    <div class="payment-success-actions">
+      <a href="{{ success_links.paid }}">Показать оплаченные</a>
+      {% if success_links.order %}
+        <a href="{{ success_links.order }}">Открыть заявку</a>
+      {% endif %}
+    </div>
+  </div>
+{% endif %}
+
+{% if show_results %}
+  <div class="payment-stats-note">
+    {% if filters.payment_status == "paid" or filters.detail == "paid" %}
+      Открыт список оплаченных заявок.
+    {% elif filters.view == "unpaid" %}
+      Открыт список неоплаченных заявок.
+    {% else %}
+      Сводка по текущему списку.
+    {% endif %}
+  </div>
+  <section class="payment-stats" aria-label="Статистика оплат">
+    <a class="payment-stat-row {% if filters.detail in ['', 'all'] %}active{% endif %}" href="{{ stat_links.all }}">
+      <span>Всего в списке</span>
+      <strong>{{ list_data.total_count }}</strong>
+      <em>Показать все</em>
+    </a>
+    {% if filters.view != "unpaid" %}
+      <a class="payment-stat-row {% if filters.detail == 'paid' %}active{% endif %}" href="{{ stat_links.paid }}">
+        <span>Оплачено</span>
+        <strong>{{ list_data.paid_count }}</strong>
+        <em>Закрыто</em>
+      </a>
+    {% endif %}
+    <a class="payment-stat-row {% if filters.detail == 'unpaid' %}active{% endif %}" href="{{ stat_links.unpaid }}">
+      <span>Не оплачено</span>
+      <strong>{{ list_data.pending_count + list_data.partial_count }}</strong>
+      <em>{% if list_data.partial_count %}{{ list_data.partial_count }} с остатком{% else %}Без оплаты{% endif %}</em>
+    </a>
+    <a class="payment-stat-row" href="{{ stat_links.all }}">
+      <span>Выручка</span>
+      <strong>{{ list_data.delivery_cost_total|money }}</strong>
+      <em>По списку</em>
+    </a>
+    <a class="payment-stat-row" href="{{ stat_links.all }}">
+      <span>ЗП курьера</span>
+      <strong>{{ list_data.courier_pay_total|money }}</strong>
+      <em>По списку</em>
+    </a>
+    <a class="payment-stat-row" href="{{ stat_links.all }}">
+      <span>Итого в кассу</span>
+      <strong>{{ (list_data.delivery_cost_total - list_data.courier_pay_total)|money }}</strong>
+      <em>Без нал/безнал</em>
+    </a>
+  </section>
+  {% if filters.view == "unpaid" %}
+    <div class="payment-paid-callout">
+      <div>
+        <div class="payment-paid-callout-title">Оплаченные заявки скрыты в этом списке</div>
+        <div class="payment-paid-callout-text">Откройте отдельный список, чтобы проверить уже закрытые оплаты.</div>
+      </div>
+      <a class="secondary-btn" href="{{ success_links.paid }}">Показать оплаченные</a>
+    </div>
+  {% endif %}
+
+  <div class="result-note" data-payment-filter-result>
+    Показано заявок: <span data-payment-filter-count>{{ list_data.shown_count }}</span>
+  </div>
+{% else %}
+  <div class="empty-note payment-start-note">
+    Выберите дату, статус или поиск. Можно открыть неоплаченные заявки.
+  </div>
+{% endif %}
+
+{% if show_results and rows %}
+  <section class="table-wrap" data-payment-filter-results>
+    <table class="payments-table">
+      <colgroup>
+        <col class="payments-col-code">
+        <col class="payments-col-client">
+        <col class="payments-col-date">
+        <col class="payments-col-amount">
+        <col class="payments-col-method">
+        <col class="payments-col-status">
+        <col class="payments-col-actions">
+      </colgroup>
+      <thead>
+        <tr>
+          <th>Номер</th>
+          <th>Клиент</th>
+          <th>Дата</th>
+          <th>Сумма</th>
+          <th>Способ</th>
+          <th>Статус</th>
+          <th>Действия</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+          {% set payment_search = row.order.order_code ~ ' ' ~ row.order.client_name_snapshot ~ ' ' ~ row.order.client_phone_snapshot %}
+          <tr id="payment-order-{{ row.order.id }}" class="{% if focus_order_id == row.order.id %}payment-focus-row{% endif %}" data-payment-filter-item data-payment-id="{{ row.order.id }}" data-payment-search="{{ payment_search|e }}">
+            <td><span class="num">{{ row.order.order_code }}</span></td>
+            <td>
+              <div class="client">{{ row.order.client_name_snapshot }}</div>
+              <div class="subtle">{{ row.order.client_phone_snapshot|phone }}</div>
+            </td>
+            <td>{{ row.order.delivery_date|ru_date }}</td>
+            <td><span class="amount">{{ row.payment_amount|money }}</span></td>
+            <td>{{ payment_method_label(row.payment.method) if row.payment else "Не указан" }}</td>
+            <td>
+              <span class="status {{ payment_status_class(row.payment_status) }}">
+                {{ payment_status_label(row.payment_status) }}
+              </span>
+            </td>
+            <td>
+              <div class="payment-cell-flow">
+                {% if row.payment_status.value == "paid" or row.remaining_amount <= 0 %}
+                  <div class="payment-status-message">
+                    {% if row.payment_status.value == "paid" %}
+                      <span class="payment-closed-badge">Оплата закрыта</span>
+                    {% else %}
+                      <span class="payment-closed-badge">Нет суммы к оплате</span>
+                    {% endif %}
+                  </div>
+                  <div class="payment-action-links">
+                    <a class="secondary-btn payment-btn-sm" href="/orders/{{ row.order.id }}">Открыть заявку</a>
+                    {% if user.role.value == "admin" and row.payment %}
+                      <form class="payment-delete-form inline-form" method="post" action="/payments/{{ row.payment.id }}/delete">
+                        <input type="hidden" name="q" value="{{ filters.q }}">
+                        <input type="hidden" name="payment_status" value="{{ filters.payment_status }}">
+                        <input type="hidden" name="delivery_date_filter" value="{{ filters.delivery_date }}">
+                        <input type="hidden" name="detail" value="{{ filters.detail }}">
+                        <input type="hidden" name="view" value="{{ filters.view }}">
+                        <button class="danger-btn payment-btn-sm payment-delete" type="submit">Удалить</button>
+                      </form>
+                    {% endif %}
+                  </div>
+                {% else %}
+                  <div class="payment-pay-block">
+                    <div class="payment-amount-due">К оплате: <strong>{{ row.payment_amount|money }}</strong></div>
+                    <form class="payment-row-form payment-pay-form" method="post" action="/payments/{{ row.order.id }}/pay">
+                      <input type="hidden" name="q" value="{{ filters.q }}">
+                      <input type="hidden" name="payment_status" value="{{ filters.payment_status }}">
+                      <input type="hidden" name="delivery_date_filter" value="{{ filters.delivery_date }}">
+                      <input type="hidden" name="detail" value="{{ filters.detail }}">
+                      <input type="hidden" name="view" value="{{ filters.view }}">
+                      <input class="payment-amount-input" name="amount" value="{{ row.payment_amount }}" aria-label="Сумма оплаты" type="hidden">
+
+                      <div class="payment-pay-inputs">
+                        <select name="method" aria-label="Способ оплаты" class="payment-select-sm">
+                          {% for method in payment_methods %}
+                            <option value="{{ method.value }}" {% if method.value == "cash" %}selected{% endif %}>
+                              {{ payment_method_label(method) }}
+                            </option>
+                          {% endfor %}
+                        </select>
+                        <button class="primary-btn payment-btn-sm payment-submit" type="submit">Оплатить</button>
+                      </div>
+                    </form>
+                  </div>
+                  <div class="payment-action-links">
+                    <a class="secondary-btn payment-btn-sm" href="/orders/{{ row.order.id }}">Открыть заявку</a>
+                    {% if user.role.value == "admin" and row.payment %}
+                      <form class="payment-delete-form inline-form" method="post" action="/payments/{{ row.payment.id }}/delete">
+                        <input type="hidden" name="q" value="{{ filters.q }}">
+                        <input type="hidden" name="payment_status" value="{{ filters.payment_status }}">
+                        <input type="hidden" name="delivery_date_filter" value="{{ filters.delivery_date }}">
+                        <input type="hidden" name="detail" value="{{ filters.detail }}">
+                        <input type="hidden" name="view" value="{{ filters.view }}">
+                        <button class="danger-btn payment-btn-sm payment-delete" type="submit">Удалить</button>
+                      </form>
+                    {% endif %}
+                  </div>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+
+  <section class="cards" aria-label="Оплаты" data-payment-filter-results>
+    {% for row in rows %}
+      {% set payment_search = row.order.order_code ~ ' ' ~ row.order.client_name_snapshot ~ ' ' ~ row.order.client_phone_snapshot %}
+      <article id="payment-card-{{ row.order.id }}" class="payment-card {% if focus_order_id == row.order.id %}payment-focus-card{% endif %}" data-payment-filter-item data-payment-id="{{ row.order.id }}" data-payment-search="{{ payment_search|e }}">
+        <div class="card-top">
+          <div>
+            <div class="card-number">{{ row.order.order_code }}</div>
+            <div class="card-client">{{ row.order.client_name_snapshot }}</div>
+          </div>
+          <span class="status {{ payment_status_class(row.payment_status) }}">
+            {{ payment_status_label(row.payment_status) }}
+          </span>
+        </div>
+        <div class="card-grid">
+          <div>
+            <div class="meta-label">Телефон</div>
+            <div class="meta-value">{{ row.order.client_phone_snapshot|phone }}</div>
+          </div>
+          <div>
+            <div class="meta-label">Дата доставки</div>
+            <div class="meta-value">{{ row.order.delivery_date|ru_date }}</div>
+          </div>
+          <div>
+            <div class="meta-label">Сумма</div>
+            <div class="meta-value amount">{{ row.payment_amount|money }}</div>
+          </div>
+          <div>
+            <div class="meta-label">Способ</div>
+            <div class="meta-value">{{ payment_method_label(row.payment.method) if row.payment else "Не указан" }}</div>
+          </div>
+        </div>
+        <div class="payment-card-flow">
+          {% if row.payment_status.value == "paid" or row.remaining_amount <= 0 %}
+            <div class="payment-status-message-card">
+              {% if row.payment_status.value == "paid" %}
+                <span class="payment-closed-badge-card">Оплата закрыта</span>
+              {% else %}
+                <span class="payment-closed-badge-card">Нет суммы к оплате</span>
+              {% endif %}
+            </div>
+            <div class="payment-card-btns">
+              <a class="card-btn secondary-btn" href="/orders/{{ row.order.id }}">Открыть заявку</a>
+              {% if user.role.value == "admin" and row.payment %}
+                <form method="post" action="/payments/{{ row.payment.id }}/delete" class="inline-form">
+                  <input type="hidden" name="q" value="{{ filters.q }}">
+                  <input type="hidden" name="payment_status" value="{{ filters.payment_status }}">
+                  <input type="hidden" name="delivery_date_filter" value="{{ filters.delivery_date }}">
+                  <input type="hidden" name="detail" value="{{ filters.detail }}">
+                  <input type="hidden" name="view" value="{{ filters.view }}">
+                  <button class="danger-btn card-btn-danger" type="submit">Удалить оплату</button>
+                </form>
+              {% endif %}
+            </div>
+          {% else %}
+            <div class="payment-pay-block-card">
+              <div class="payment-amount-due-card">К оплате: <strong>{{ row.payment_amount|money }}</strong></div>
+              <form class="payment-card-pay-form" method="post" action="/payments/{{ row.order.id }}/pay">
+                <input type="hidden" name="q" value="{{ filters.q }}">
+                <input type="hidden" name="payment_status" value="{{ filters.payment_status }}">
+                <input type="hidden" name="delivery_date_filter" value="{{ filters.delivery_date }}">
+                <input type="hidden" name="detail" value="{{ filters.detail }}">
+                <input type="hidden" name="view" value="{{ filters.view }}">
+                <input type="hidden" name="amount" value="{{ row.payment_amount }}">
+
+                <div class="payment-card-pay-inputs">
+                  <select name="method" aria-label="Способ оплаты">
+                    {% for method in payment_methods %}
+                      <option value="{{ method.value }}" {% if method.value == "cash" %}selected{% endif %}>
+                        {{ payment_method_label(method) }}
+                      </option>
+                    {% endfor %}
+                  </select>
+                  <button class="primary-btn" type="submit">Оплатить</button>
+                </div>
+              </form>
+            </div>
+            <div class="payment-card-btns">
+              <a class="card-btn secondary-btn" href="/orders/{{ row.order.id }}">Открыть заявку</a>
+              {% if user.role.value == "admin" and row.payment %}
+                <form method="post" action="/payments/{{ row.payment.id }}/delete" class="inline-form">
+                  <input type="hidden" name="q" value="{{ filters.q }}">
+                  <input type="hidden" name="payment_status" value="{{ filters.payment_status }}">
+                  <input type="hidden" name="delivery_date_filter" value="{{ filters.delivery_date }}">
+                  <input type="hidden" name="detail" value="{{ filters.detail }}">
+                  <input type="hidden" name="view" value="{{ filters.view }}">
+                  <button class="danger-btn card-btn-danger" type="submit">Удалить оплату</button>
+                </form>
+              {% endif %}
+            </div>
+          {% endif %}
+        </div>
+      </article>
+    {% endfor %}
+  </section>
+  <div class="empty-note" data-payment-filter-empty hidden>Заявки не найдены. Проверьте номер, клиента или телефон.</div>
+{% elif show_results %}
+  <div class="empty-note">Заявок по фильтрам нет.</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,307 @@
+{% extends "base.html" %}
+
+{% block title %}Мои заявки{% endblock %}
+{% block wrap_class %} work-page-wrap courier-page-wrap{% endblock %}
+
+{% block content %}
+{% set show_today_money = dashboard.is_today and filters.mode == "date" %}
+<section class="topbar">
+  <div class="title-block">
+    <h1>Мои заявки</h1>
+    {% if dashboard %}
+      <p>{{ dashboard.period_start|ru_date }}{% if dashboard.period_end != dashboard.period_start %} - {{ dashboard.period_end|ru_date }}{% endif %}</p>
+    {% else %}
+      <p>Заявки, суммы и сдача денег в офис.</p>
+    {% endif %}
+  </div>
+  <div class="courier-head-actions">
+    {% if dashboard %}
+      <div class="courier-name">{{ dashboard.courier.full_name }}</div>
+    {% endif %}
+    <form method="post" action="/logout">
+      <button class="secondary-btn courier-logout" type="submit">Выйти</button>
+    </form>
+  </div>
+</section>
+
+{% if dashboard %}
+  <section class="filters courier-period-filter" aria-label="Период">
+    <form class="filters-grid courier-period-grid" method="get" action="/courier">
+      <div class="field">
+        <label for="courier-mode">Период</label>
+        <select id="courier-mode" name="mode" data-courier-mode>
+          <option value="date" {% if filters.mode == "date" %}selected{% endif %}>Дата</option>
+          <option value="period" {% if filters.mode == "period" %}selected{% endif %}>Диапазон</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="courier-date-from">С даты</label>
+        <input id="courier-date-from" name="date_from" type="date" value="{{ filters.date_from }}" data-courier-date-from>
+      </div>
+      <div class="field" data-courier-date-to-field {% if filters.mode != "period" %}hidden{% endif %}>
+        <label for="courier-date-to">По дату</label>
+        <input id="courier-date-to" name="date_to" type="date" value="{{ filters.date_to }}" data-courier-date-to>
+      </div>
+      <div class="filter-actions" data-courier-filter-actions {% if filters.mode != "period" %}hidden{% endif %}>
+        <button class="primary-btn" type="submit">Показать</button>
+      </div>
+    </form>
+  </section>
+
+  {% if error %}
+    <div class="alert alert-danger">{{ error }}</div>
+  {% endif %}
+
+  <section class="courier-summary-panel" aria-label="Сводка">
+    <div class="section-head courier-summary-head">
+      <h2>Сводка</h2>
+    </div>
+    <div class="courier-stat-list">
+      <div class="courier-stat-row courier-stat-row-static">
+        <span>Всего рабочих дней</span>
+        <strong>{{ dashboard.working_days_count }}</strong>
+        <em>Есть заявки</em>
+      </div>
+      <a class="courier-stat-row {% if filters.detail == 'assigned' %}active{% endif %}" href="{{ detail_links.assigned }}">
+        <span>Всего заявок назначено</span>
+        <strong>{{ dashboard.period_orders_count }}</strong>
+        <em>{{ dashboard.period_in_work_count }} в работе, {{ dashboard.period_at_courier_count }} у курьера</em>
+      </a>
+      <a class="courier-stat-row {% if filters.detail == 'delivered' %}active{% endif %}" href="{{ detail_links.delivered }}">
+        <span>Доставлено</span>
+        <strong>{{ dashboard.period_delivered_count }}</strong>
+        <em>Показать список</em>
+      </a>
+      <div class="courier-stat-row courier-stat-row-static">
+        <span>ЗП</span>
+        <strong class="profit">{{ dashboard.money.paid_courier_pay_total|money }}</strong>
+        <em>После оплаты</em>
+      </div>
+    </div>
+  </section>
+
+  <div class="layout courier-dashboard-layout">
+    <section class="panel section">
+      <div class="section-head">
+        <h2>{{ dashboard.detail_title or "Заявки" }}</h2>
+        <p>Заявки курьера {{ dashboard.courier.full_name }} за выбранный период.</p>
+      </div>
+
+      {% if orders %}
+        <div class="courier-order-list" aria-label="Заявки курьера">
+          {% for order in orders %}
+            <article class="courier-order-row">
+              <div class="courier-order-main">
+                <div class="courier-order-head">
+                  <span class="num">{{ order.order_code }}</span>
+                  <span class="cargo-pill cargo-pill-strong">{{ order.cargo_number or "Не указан" }}</span>
+                  <span class="status {{ order.status|status_class }}">{{ order.status|status_label }}</span>
+                </div>
+                <div class="client courier-order-client">{{ order.client_name_snapshot }}</div>
+                <div class="courier-order-grid">
+                  <div>
+                    <div class="meta-label">Телефон</div>
+                    <div class="meta-value nowrap">{{ order.client_phone_snapshot|phone }}</div>
+                  </div>
+                  <div>
+                    <div class="meta-label">Адрес</div>
+                    <div class="meta-value courier-text-preview" title="{{ order.address }}">{{ order.address }}</div>
+                  </div>
+                  <div>
+                    <div class="meta-label">Примечание</div>
+                    <div class="meta-value courier-text-preview courier-note-preview" title="{{ order.staff_note or 'Нет примечания' }}">{{ order.staff_note or "Нет примечания" }}</div>
+                  </div>
+                  <div>
+                    <div class="meta-label">Дата</div>
+                    <div class="meta-value">{{ order.delivery_date|ru_date }}</div>
+                  </div>
+                  {% if show_today_money %}
+                    <div>
+                      <div class="meta-label">Выручка</div>
+                      <div class="meta-value amount">{{ order.delivery_cost|money }}</div>
+                    </div>
+                  {% endif %}
+                  <div>
+                    <div class="meta-label">ЗП курьера</div>
+                    <div class="meta-value amount">{{ order.courier_pay|money }}</div>
+                  </div>
+                </div>
+              </div>
+              <div class="courier-order-actions">
+                <a class="action-link" href="/courier/orders/{{ order.id }}">Открыть</a>
+                {% if order.status.value == "in_work" and user.role.value == "courier" %}
+                  <form method="post" action="/courier/orders/{{ order.id }}/at-courier">
+                    <button class="action-link" type="submit">У курьера</button>
+                  </form>
+                {% elif order.status.value == "at_courier" and user.role.value == "courier" %}
+                  <form method="post" action="/courier/orders/{{ order.id }}/delivered">
+                    <button class="action-link" type="submit">Доставлено</button>
+                  </form>
+                {% endif %}
+              </div>
+            </article>
+          {% endfor %}
+        </div>
+
+        <div class="cards" aria-label="Заявки курьера">
+          {% for order in orders %}
+            <article class="order-card">
+              <div class="card-top">
+                <div>
+                  <div class="card-number">{{ order.order_code }}</div>
+                  <div class="cargo-line"><span class="cargo-pill cargo-pill-strong">{{ order.cargo_number or "Не указан" }}</span></div>
+                  <div class="card-client">{{ order.client_name_snapshot }}</div>
+                </div>
+                <span class="status {{ order.status|status_class }}">{{ order.status|status_label }}</span>
+              </div>
+              <div class="card-grid">
+                <div>
+                  <div class="meta-label">Телефон</div>
+                  <div class="meta-value">{{ order.client_phone_snapshot|phone }}</div>
+                </div>
+                <div>
+                  <div class="meta-label">Дата доставки</div>
+                  <div class="meta-value">{{ order.delivery_date|ru_date }}</div>
+                </div>
+                <div>
+                  <div class="meta-label">Адрес</div>
+                  <div class="meta-value courier-card-preview">{{ order.address }}</div>
+                </div>
+                <div>
+                  <div class="meta-label">Примечание</div>
+                  <div class="meta-value courier-card-preview">{{ order.staff_note or "Нет примечания" }}</div>
+                </div>
+                {% if show_today_money %}
+                  <div>
+                    <div class="meta-label">Выручка</div>
+                    <div class="meta-value amount">{{ order.delivery_cost|money }}</div>
+                  </div>
+                {% endif %}
+                <div>
+                  <div class="meta-label">ЗП курьера</div>
+                  <div class="meta-value amount">{{ order.courier_pay|money }}</div>
+                </div>
+              </div>
+              <div class="card-actions">
+                <a class="card-btn" href="/courier/orders/{{ order.id }}">Открыть</a>
+                {% if order.status.value == "in_work" and user.role.value == "courier" %}
+                  <form method="post" action="/courier/orders/{{ order.id }}/at-courier">
+                    <button class="card-btn" type="submit">У курьера</button>
+                  </form>
+                {% elif order.status.value == "at_courier" and user.role.value == "courier" %}
+                  <form method="post" action="/courier/orders/{{ order.id }}/delivered">
+                    <button class="card-btn" type="submit">Доставлено</button>
+                  </form>
+                {% endif %}
+              </div>
+            </article>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="empty-note">{% if show_today_money %}На сегодня заявок нет{% else %}За этот период заявок нет{% endif %}</div>
+      {% endif %}
+    </section>
+
+    {% if show_today_money %}
+    <aside class="aside">
+      <section class="panel section">
+        <div class="section-head">
+          <h2>Деньги</h2>
+          <p>Карта не входит в сумму на руках.</p>
+        </div>
+        <div class="fact"><div class="fact-name">Оплачено</div><div class="fact-value">{{ dashboard.money.paid_total|money }}</div></div>
+        <div class="fact"><div class="fact-name">ЗП</div><div class="fact-value">{{ dashboard.money.paid_courier_pay_total|money }}</div></div>
+        <div class="fact"><div class="fact-name">Наличные у курьера</div><div class="fact-value">{{ dashboard.money.cash_total|money }}</div></div>
+        <div class="fact"><div class="fact-name">На проверке</div><div class="fact-value">{{ dashboard.money.pending_total|money }}</div></div>
+        <div class="total-box">
+          <div class="total-label">Итого в кассу</div>
+          <div class="total-value">{{ dashboard.money.due_to_office|money }}</div>
+          <div class="total-note">Наличные минус ЗП и сдачи.</div>
+        </div>
+      </section>
+
+      {% if user.role.value == "courier" %}
+        <section class="panel section">
+          <div class="section-head">
+            <h2>Выдано</h2>
+            <p>Сумма попадёт на проверку админу.</p>
+          </div>
+          <form class="handover-form" method="post" action="/courier/handovers">
+            <input type="hidden" name="mode" value="{{ filters.mode }}">
+            <input type="hidden" name="period_start" value="{{ filters.date_from }}">
+            <input type="hidden" name="period_end" value="{{ filters.date_to }}">
+            <div class="field">
+              <label for="handover-amount">Сумма</label>
+              <input id="handover-amount" name="amount" inputmode="decimal" placeholder="0">
+            </div>
+            <button class="primary-btn w-100" type="submit">Выдано</button>
+          </form>
+        </section>
+      {% endif %}
+
+      <section class="panel section">
+        <div class="section-head">
+          <h2>История сдач</h2>
+        </div>
+        <div class="history-list">
+          {% set pending_handovers = dashboard.handovers|selectattr("status.value", "equalto", "pending")|list %}
+          {% if pending_handovers %}
+            {% for handover in pending_handovers %}
+              <div class="handover-note">
+                <div>
+                  <div class="value">{{ handover.amount|money }}</div>
+                  <div class="subtle">{{ handover.created_at|ru_datetime }}</div>
+                </div>
+                <span class="status {{ handover.status.value|handover_status_class }}">{{ handover.status.value|handover_status_label }}</span>
+              </div>
+            {% endfor %}
+          {% else %}
+            <div class="subtle">Сдач на проверке пока нет</div>
+          {% endif %}
+        </div>
+      </section>
+    </aside>
+    {% endif %}
+  </div>
+
+  <script>
+    (() => {
+      const mode = document.querySelector('[data-courier-mode]');
+      const fromInput = document.querySelector('[data-courier-date-from]');
+      const toInput = document.querySelector('[data-courier-date-to]');
+      const toField = document.querySelector('[data-courier-date-to-field]');
+      if (!mode || !fromInput || !toInput || !toField) return;
+
+      const submitActions = document.querySelector('[data-courier-filter-actions]');
+
+      const syncPeriodFields = () => {
+        const isPeriod = mode.value === 'period';
+        fromInput.disabled = false;
+        toInput.disabled = !isPeriod;
+        toField.hidden = !isPeriod;
+        if (submitActions) {
+          submitActions.hidden = !isPeriod;
+        }
+        if (mode.value === 'date') {
+          toInput.value = fromInput.value;
+        }
+      };
+
+      mode.addEventListener('change', syncPeriodFields);
+      fromInput.addEventListener('change', () => {
+        if (mode.value === 'date') {
+          toInput.value = fromInput.value;
+          if (fromInput.form?.requestSubmit) {
+            fromInput.form.requestSubmit();
+          } else {
+            fromInput.form?.submit();
+          }
+        }
+      });
+      syncPeriodFields();
+    })();
+  </script>
+{% else %}
+  <div class="empty-note">Активных курьеров пока нет.</div>
+{% endif %}
+{% endblock %}

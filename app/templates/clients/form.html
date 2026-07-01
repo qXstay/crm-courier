@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+
+{% block title %}{% if is_edit %}Редактирование клиента{% else %}Создание клиента{% endif %}{% endblock %}
+
+{% macro value(name, fallback="") -%}{{ values.get(name) if values.get(name) is not none else fallback }}{%- endmacro %}
+
+{% block content %}
+<section class="page-head">
+  <div class="title-block">
+    <div class="crumbs">
+      <a href="/clients">Клиенты</a>
+      <span>•</span>
+      <span>{% if is_edit %}Редактирование{% else %}Создание{% endif %}</span>
+    </div>
+    <h1>{% if is_edit %}Редактирование клиента{% else %}Создание клиента{% endif %}</h1>
+    <p>Контакты клиента для заявок и связи.</p>
+  </div>
+</section>
+
+{% if error %}
+  <div class="alert alert-danger" role="alert">
+    <div>{{ error }}</div>
+    {% if duplicate_client %}
+      <a class="action-link client-alert-link" href="/clients/{{ duplicate_client.id }}">Открыть клиента</a>
+    {% endif %}
+  </div>
+{% endif %}
+
+{% if possible_matches %}
+  <div class="warning-box">
+    <div>
+      <div class="warning-title">Похожий клиент уже есть</div>
+      <div class="warning-text">Проверьте список перед сохранением.</div>
+      {% for match in possible_matches %}
+        <div class="warning-phone">
+          <a href="/clients/{{ match.id }}">{{ match.full_name }}</a>, {{ match.phone|phone }}
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+{% endif %}
+
+<form class="layout client-form" method="post" action="{% if is_edit %}/clients/{{ client.id }}/edit{% else %}/clients{% endif %}">
+  <section class="panel">
+    <div class="section">
+      <div class="section-head">
+        <h2>Данные клиента</h2>
+      </div>
+
+      <div class="grid">
+        <div class="field col-7">
+          <label for="full_name">ФИО клиента *</label>
+          <input id="full_name" name="full_name" value="{{ value('full_name', client.full_name if client else '') }}" placeholder="Введите имя клиента" autocomplete="name">
+        </div>
+        <div class="field col-5">
+          <label for="phone">Телефон *</label>
+          <input id="phone" name="phone" type="tel" value="{{ value('phone', client.phone if client else '+7 ') }}" placeholder="+7 900 000-00-00" inputmode="tel" autocomplete="tel" data-phone-mask>
+        </div>
+        <div class="field col-12">
+          <label for="notes">Заметки</label>
+          <textarea id="notes" name="notes" placeholder="Короткая заметка">{{ value('notes', client.notes if client and client.notes else '') }}</textarea>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="actions">
+    <button class="btn btn-primary" type="submit">{% if is_edit %}Сохранить{% else %}Создать{% endif %}</button>
+    <a class="btn" href="{% if is_edit %}/clients/{{ client.id }}{% else %}/clients{% endif %}">Отмена</a>
+  </div>
+</form>
+
+<script>
+  const phoneInput = document.querySelector('[data-phone-mask]');
+
+  function phoneTail(value) {
+    const trimmed = value.trim();
+    let digits = value.replace(/\D/g, '');
+    if (trimmed.startsWith('+7') && digits.startsWith('7')) {
+      digits = digits.slice(1);
+    } else if (digits.length > 10 && (digits.startsWith('7') || digits.startsWith('8'))) {
+      digits = digits.slice(1);
+    }
+    return digits.slice(0, 10);
+  }
+
+  function formatPhoneTail(tail) {
+    let value = '+7';
+    if (tail.length > 0) value += ' ' + tail.slice(0, 3);
+    if (tail.length > 3) value += ' ' + tail.slice(3, 6);
+    if (tail.length > 6) value += '-' + tail.slice(6, 8);
+    if (tail.length > 8) value += '-' + tail.slice(8, 10);
+    return value + (tail.length === 0 ? ' ' : '');
+  }
+
+  function applyPhoneMask() {
+    if (!phoneInput) return;
+    phoneInput.value = formatPhoneTail(phoneTail(phoneInput.value));
+    phoneInput.classList.remove('is-invalid');
+  }
+
+  phoneInput?.addEventListener('focus', applyPhoneMask);
+  phoneInput?.addEventListener('input', applyPhoneMask);
+  phoneInput?.addEventListener('blur', applyPhoneMask);
+</script>
+{% endblock %}

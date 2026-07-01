@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+
+{% block title %}{{ client.full_name }}{% endblock %}
+{% block wrap_class %} client-detail-wrap{% endblock %}
+
+{% block content %}
+<section class="page-head">
+  <div class="title-block">
+    <div class="crumbs">
+      <a href="/clients">Клиенты</a>
+      <span>•</span>
+      <span>Карточка</span>
+    </div>
+    <div class="title-row">
+      <h1>{{ client.full_name }}</h1>
+      {% if client.notes %}
+        <span class="client-note-pill">{{ client.notes }}</span>
+      {% endif %}
+    </div>
+    <p>{{ client.phone|phone }}</p>
+  </div>
+  <div class="head-actions">
+    <a class="btn" href="/clients/{{ client.id }}/edit">Изменить</a>
+    <a class="btn btn-primary" href="/orders/new?client_id={{ client.id }}">Создать заявку</a>
+  </div>
+</section>
+
+<section class="summary summary-5 client-status-summary">
+  <div class="summary-card">
+    <div class="summary-label">Всего заявок</div>
+    <div class="summary-value">{{ detail.total_orders_count }}</div>
+  </div>
+  <div class="summary-card">
+    <div class="summary-label">В работе</div>
+    <div class="summary-value">{{ detail.in_work_orders_count }}</div>
+  </div>
+  <div class="summary-card">
+    <div class="summary-label">У курьера</div>
+    <div class="summary-value">{{ detail.at_courier_orders_count }}</div>
+  </div>
+  <div class="summary-card">
+    <div class="summary-label">Доставлено</div>
+    <div class="summary-value">{{ detail.delivered_orders_count }}</div>
+  </div>
+  <div class="summary-card">
+    <div class="summary-label">В архиве</div>
+    <div class="summary-value">{{ detail.archived_orders_count }}</div>
+  </div>
+</section>
+
+<div class="layout client-detail-layout">
+  <section class="panel section">
+    <div class="section-head">
+      <h2>Клиент</h2>
+    </div>
+    <div class="data-grid">
+      <div>
+        <div class="label">ФИО</div>
+        <div class="value">{{ client.full_name }}</div>
+      </div>
+      <div>
+        <div class="label">Телефон</div>
+        <div class="value">{{ client.phone|phone }}</div>
+      </div>
+      <div>
+        <div class="label">Дата создания</div>
+        <div class="value">{{ client.created_at|ru_datetime }}</div>
+      </div>
+      <div class="data-item wide">
+        <div class="label">Заметки</div>
+        <div class="note-box">{{ client.notes if client.notes else "Нет заметок" }}</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel section">
+    <div class="section-head">
+      <h2>История заявок</h2>
+      <p>Показаны активные заявки клиента.</p>
+    </div>
+
+    {% if orders %}
+      <div class="table-wrap">
+        <table class="client-orders-table">
+          <colgroup>
+            <col class="client-orders-col-code">
+            <col class="client-orders-col-date">
+            <col class="client-orders-col-address">
+            <col class="client-orders-col-courier">
+            <col class="client-orders-col-status">
+            <col class="client-orders-col-amount">
+            <col class="client-orders-col-action">
+          </colgroup>
+          <thead>
+            <tr>
+              <th>Номер</th>
+              <th>Дата доставки</th>
+              <th>Адрес</th>
+              <th>Курьер</th>
+              <th>Статус</th>
+              <th>Стоимость</th>
+              <th>Действие</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for order in orders %}
+              <tr>
+                <td><span class="num">{{ order.order_code }}</span></td>
+                <td>{{ order.delivery_date|ru_date }}</td>
+                <td><div class="address">{{ order.address }}</div></td>
+                <td>{{ order.courier.full_name if order.courier else "Не назначен" }}</td>
+                <td><span class="status {{ order.status|status_class }}">{{ order.status|status_label }}</span></td>
+                <td><span class="amount">{{ order.delivery_cost|money }}</span></td>
+                <td><a class="action-link" href="/orders/{{ order.id }}">Открыть</a></td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <section class="cards" aria-label="История заявок клиента">
+        {% for order in orders %}
+          <article class="order-card">
+            <div class="card-top">
+              <div>
+                <div class="card-number">{{ order.order_code }}</div>
+                <div class="card-client">{{ order.address }}</div>
+              </div>
+              <span class="status {{ order.status|status_class }}">{{ order.status|status_label }}</span>
+            </div>
+            <div class="card-grid">
+              <div>
+                <div class="meta-label">Дата доставки</div>
+                <div class="meta-value">{{ order.delivery_date|ru_date }}</div>
+              </div>
+              <div>
+                <div class="meta-label">Курьер</div>
+                <div class="meta-value">{{ order.courier.full_name if order.courier else "Не назначен" }}</div>
+              </div>
+              <div>
+                <div class="meta-label">Стоимость</div>
+                <div class="meta-value amount">{{ order.delivery_cost|money }}</div>
+              </div>
+            </div>
+            <div class="card-actions">
+              <a class="card-btn" href="/orders/{{ order.id }}">Открыть</a>
+            </div>
+          </article>
+        {% endfor %}
+      </section>
+    {% else %}
+      <div class="empty-note">Активных заявок клиента пока нет.</div>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

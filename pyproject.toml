@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "courier-crm-demo"
+version = "0.1.0"
+description = "Courier CRM public demo showcase"
+requires-python = "==3.12.*"
+readme = "README.md"
+dependencies = [
+  "fastapi[standard]==0.115.6",
+  "starlette==0.41.3",
+  "uvicorn[standard]",
+  "jinja2",
+  "SQLAlchemy>=2.0,<3.0",
+  "psycopg[binary]",
+  "python-dotenv",
+  "passlib[bcrypt]",
+  "bcrypt==4.0.1",
+  "itsdangerous",
+  "python-multipart",
+  "httpx",
+]
+
+[tool.fastapi]
+entrypoint = "app.main:app"
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+exclude = ["migrations*", "tests*", "scripts*"]

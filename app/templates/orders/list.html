@@ -1,0 +1,856 @@
+{% extends "base.html" %}
+
+{% block title %}Заявки{% endblock %}
+{% block wrap_class %} work-page-wrap orders-page-wrap{% endblock %}
+
+{% block content %}
+<section class="topbar">
+  <div class="title-block">
+    <h1>Заявки</h1>
+    <p>Активные заявки менеджера. Архивные заявки здесь не показываются.</p>
+  </div>
+  <a class="primary-btn" href="/orders/new">Создать заявку</a>
+</section>
+
+<form class="filters order-filters" method="get" action="/orders" data-order-filter-form data-server-filtered="{% if filters_active %}true{% else %}false{% endif %}">
+  <div class="filters-grid order-filters-grid order-filters-main">
+    <div class="field">
+      <label for="q">Поиск</label>
+      <input id="q" name="q" value="{{ filters.q }}" placeholder="Номер, клиент, телефон, адрес или курьер" autocomplete="off" data-order-filter-input>
+    </div>
+    <div class="field">
+      <label for="order-sort">Сортировка</label>
+      <select id="order-sort" name="sort" data-order-sort>
+        <option value="newest" {% if filters.sort == "newest" %}selected{% endif %}>Сначала новые</option>
+        <option value="number" {% if filters.sort == "number" %}selected{% endif %}>По номеру</option>
+        <option value="delivery_date" {% if filters.sort == "delivery_date" %}selected{% endif %}>По дате доставки</option>
+        <option value="courier" {% if filters.sort == "courier" %}selected{% endif %}>По курьеру</option>
+        <option value="payment" {% if filters.sort == "payment" %}selected{% endif %}>По оплате</option>
+        <option value="status" {% if filters.sort == "status" %}selected{% endif %}>По статусу</option>
+      </select>
+    </div>
+    <div class="filter-actions">
+      <a class="secondary-btn" href="/orders" data-order-filter-reset {% if not filters_active %}hidden{% endif %}>Сброс</a>
+    </div>
+  </div>
+  <div class="filters-grid order-filters-grid order-filters-extra">
+    <div class="field">
+      <label for="date-from">Дата доставки с</label>
+      <input id="date-from" name="date_from" type="date" value="{{ filters.date_from }}" data-order-date-from data-order-filter-control>
+    </div>
+    <div class="field">
+      <label for="date-to">Дата доставки по</label>
+      <input id="date-to" name="date_to" type="date" value="{{ filters.date_to }}" data-order-date-to data-order-filter-control>
+    </div>
+    <div class="field">
+      <label for="filter-status">Статус</label>
+      <select id="filter-status" name="status" data-order-status-filter data-order-filter-control>
+        <option value="">Все</option>
+        {% for status in statuses %}
+          <option value="{{ status.value }}" {% if filters.status == status.value %}selected{% endif %}>{{ status|status_label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="field" data-order-courier-filter-field {% if filters.status not in ["at_courier", "delivered"] %}hidden{% endif %}>
+      <label for="filter-courier">Курьер</label>
+      <select id="filter-courier" name="courier_id" data-order-courier-filter data-order-filter-control>
+        <option value="">Все</option>
+        {% for courier in couriers %}
+          <option value="{{ courier.id }}" {% if filters.courier_id == courier.id|string %}selected{% endif %}>{{ courier.full_name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+  </div>
+</form>
+
+<div class="result-note" data-order-filter-result>
+  Найдено заявок: <span data-order-filter-count>{{ total_orders_count }}</span>
+</div>
+
+{% if bulk_deleted_count %}
+  <div class="alert alert-success" role="status">Заявки удалены</div>
+{% endif %}
+
+{% if error %}
+  <div class="alert alert-danger">{{ error }}</div>
+{% endif %}
+
+{% if user.role.value == "admin" and orders %}
+  <form id="orders-bulk-form" method="post" action="/orders/bulk-archive" hidden aria-hidden="true"></form>
+  <div class="bulk-bar" data-bulk-bar hidden role="region" aria-label="Действия с выбранными заявками">
+    <span class="bulk-bar-info">Выбрано: <span data-bulk-count>0</span></span>
+    <button class="bulk-bar-link" type="button" data-bulk-select-all>Выбрать все</button>
+    <button class="bulk-bar-link" type="button" data-bulk-clear>Очистить</button>
+    <button class="danger-btn bulk-bar-delete" type="button" data-bulk-delete>Удалить выбранные</button>
+  </div>
+  <div class="crm-modal" data-bulk-delete-modal hidden aria-hidden="true">
+    <div class="crm-modal-backdrop" data-bulk-delete-close></div>
+    <section class="crm-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="bulk-delete-title" aria-describedby="bulk-delete-description" tabindex="-1">
+      <div class="crm-modal-head">
+        <h2 id="bulk-delete-title">Удалить выбранные заявки?</h2>
+      </div>
+      <p id="bulk-delete-description">Они попадут в архив и не будут учитываться в бухгалтерии.</p>
+      <div class="crm-modal-actions">
+        <button class="btn" type="button" data-bulk-delete-close>Отмена</button>
+        <button class="danger-btn" type="submit" form="orders-bulk-form">Удалить</button>
+      </div>
+    </section>
+  </div>
+{% endif %}
+
+{% if orders %}
+  <div class="crm-modal" data-quick-status-cancel-modal hidden aria-hidden="true">
+    <div class="crm-modal-backdrop" data-quick-status-cancel-close></div>
+    <section class="crm-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="quick-status-cancel-title" aria-describedby="quick-status-cancel-description" tabindex="-1">
+      <div class="crm-modal-head">
+        <h2 id="quick-status-cancel-title">Отменить заявку?</h2>
+      </div>
+      <p id="quick-status-cancel-description">Заявка попадёт в архив. Восстановить сможет админ.</p>
+      <div class="crm-modal-actions">
+        <button class="btn" type="button" data-quick-status-cancel-close>Не отменять</button>
+        <button class="danger-btn" type="button" data-quick-status-cancel-confirm>Отменить заявку</button>
+      </div>
+    </section>
+  </div>
+
+  <section class="table-wrap" data-order-filter-results>
+    <table class="orders-table">
+      <colgroup>
+        {% if user.role.value == "admin" %}<col class="orders-col-check">{% endif %}
+        <col class="orders-col-code">
+        <col class="orders-col-cargo">
+        <col class="orders-col-client">
+        <col class="orders-col-address">
+        <col class="orders-col-date">
+        <col class="orders-col-courier">
+        <col class="orders-col-cost">
+        <col class="orders-col-payment">
+        <col class="orders-col-status">
+        <col class="orders-col-actions">
+      </colgroup>
+      <thead>
+        <tr>
+          {% if user.role.value == "admin" %}<th class="orders-th-check"><input type="checkbox" id="orders-select-all" aria-label="Выбрать все заявки"></th>{% endif %}
+          <th>Номер</th>
+          <th>Груз</th>
+          <th>Клиент</th>
+          <th>Адрес</th>
+          <th>Дата доставки</th>
+          <th>Курьер</th>
+          <th>Стоимость</th>
+          <th>Оплата</th>
+          <th>Статус</th>
+          <th>Действия</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for order in orders %}
+          {% set pay_status = payment_status_for_order(order) %}
+          {% set order_search = order.order_code ~ ' ' ~ (order.cargo_number or '') ~ ' ' ~ order.client_name_snapshot ~ ' ' ~ order.client_phone_snapshot ~ ' ' ~ order.address ~ ' ' ~ (order.courier.full_name if order.courier else "Не назначен") %}
+          {% set pickup_copy_text = order.order_code ~ ' ' ~ (order.places_count if order.places_count is not none else 'мест не указано') ~ ' номер груза ' ~ (order.cargo_number or 'не указан') ~ ' номер карго ' ~ (order.cargo_phone or 'не указан') %}
+          <tr data-order-filter-item data-order-id="{{ order.id }}" data-order-search="{{ order_search|e }}" data-order-index="{{ loop.index0 }}" data-order-number="{{ order.order_number }}" data-order-date="{{ order.delivery_date.isoformat() if order.delivery_date else '' }}" data-order-courier="{{ order.courier.full_name if order.courier else '' }}" data-order-courier-id="{{ order.courier_id or '' }}" data-order-payment="{{ pay_status.value }}" data-order-status="{{ order.status.value }}">
+            {% if user.role.value == "admin" %}<td class="orders-td-check"><input type="checkbox" class="order-row-check" name="order_ids" value="{{ order.id }}" form="orders-bulk-form" aria-label="Выбрать заявку {{ order.order_code }}"></td>{% endif %}
+            <td>
+              <div class="order-number-cell">
+                <span class="num">{{ order.order_code }}</span>
+                <span class="status order-row-status {{ order.status|status_class }}">{{ order.status|status_label }}</span>
+              </div>
+            </td>
+            <td>
+              <div class="cargo-cell">
+                <span class="cargo-pill">{{ order.cargo_number or "Не указан" }}</span>
+                <div class="cargo-specs">
+                  <span>{% if order.places_count is not none %}Мест: {{ order.places_count }}{% else %}Мест не указано{% endif %}</span>
+                  <span>{% if order.weight is not none %}Вес: {{ order.weight|order_number }} кг{% else %}Вес не указан{% endif %}</span>
+                  <span>{% if order.volume is not none %}Объём: {{ order.volume|order_number }} м³{% else %}Объём не указан{% endif %}</span>
+                </div>
+              </div>
+            </td>
+            <td>
+              <div class="client">{{ order.client_name_snapshot }}</div>
+              <div class="subtle">{{ order.client_phone_snapshot }}</div>
+              {% if order.client and order.client.notes %}
+                <div class="client-note-inline">{{ order.client.notes }}</div>
+              {% endif %}
+            </td>
+            <td><div class="address">{{ order.address }}</div></td>
+            <td>{{ order.delivery_date|ru_date }}</td>
+            <td><div class="courier-name-cell">{{ order.courier.full_name if order.courier else "Не назначен" }}</div></td>
+            <td><span class="amount">{{ order.delivery_cost|money }}</span></td>
+            <td>
+              <span class="status {{ payment_status_class(pay_status) }}">{{ payment_status_label(pay_status) }}</span>
+            </td>
+            <td>
+              <form class="quick-status-form" method="post" action="/orders/{{ order.id }}/status">
+                <input type="hidden" name="q" value="{{ filters.q }}" data-order-filter-param="q">
+                <input type="hidden" name="sort" value="{{ filters.sort }}" data-order-filter-param="sort">
+                <input type="hidden" name="date_from" value="{{ filters.date_from }}" data-order-filter-param="date_from">
+                <input type="hidden" name="date_to" value="{{ filters.date_to }}" data-order-filter-param="date_to">
+                <input type="hidden" name="filter_status" value="{{ filters.status }}" data-order-filter-param="filter_status">
+                <input type="hidden" name="filter_courier_id" value="{{ filters.courier_id }}" data-order-filter-param="filter_courier_id">
+                <select name="status" aria-label="Статус заявки {{ order.order_code }}">
+                  {% for status in statuses %}
+                    <option value="{{ status.value }}" {% if order.status.value == status.value %}selected{% endif %}>
+                      {{ status|status_label }}
+                    </option>
+                  {% endfor %}
+                  <option value="{{ archive_status_action }}">Отменить</option>
+                </select>
+                <select class="quick-status-courier" name="courier_id" aria-label="Курьер заявки {{ order.order_code }}" {% if order.status.value != "at_courier" %}hidden disabled{% endif %}>
+                  <option value="">Выберите курьера</option>
+                  {% for courier in couriers %}
+                    <option value="{{ courier.id }}" {% if order.courier_id == courier.id %}selected{% endif %}>{{ courier.full_name }}</option>
+                  {% endfor %}
+                </select>
+                <button class="quick-status-submit" type="submit" aria-label="Сохранить статус" title="Сохранить статус">&#10003;</button>
+              </form>
+            </td>
+            <td>
+              <div class="row-actions table-actions">
+                <a class="action-link" href="/orders/{{ order.id }}?{{ return_url_param }}" data-order-return-link data-base-href="/orders/{{ order.id }}">Открыть</a>
+                <a class="action-link" href="/orders/{{ order.id }}/edit?{{ return_url_param }}" data-order-return-link data-base-href="/orders/{{ order.id }}/edit">Изменить</a>
+                <div class="copy-pickup-wrap">
+                  <button class="action-link copy-pickup-btn" type="button" data-pickup-copy data-pickup-copy-text="{{ pickup_copy_text|e }}">Копировать</button>
+                  <span class="copy-pickup-status" data-pickup-copy-status aria-live="polite"></span>
+                </div>
+                {% if pay_status.value != "paid" %}
+                  <details class="quick-pay">
+                    <summary>Оплатить</summary>
+                    <form class="quick-pay-form" method="post" action="/orders/{{ order.id }}/quick-pay">
+                      <input type="hidden" name="q" value="{{ filters.q }}" data-order-filter-param="q">
+                      <input type="hidden" name="sort" value="{{ filters.sort }}" data-order-filter-param="sort">
+                      <input type="hidden" name="date_from" value="{{ filters.date_from }}" data-order-filter-param="date_from">
+                      <input type="hidden" name="date_to" value="{{ filters.date_to }}" data-order-filter-param="date_to">
+                      <input type="hidden" name="filter_status" value="{{ filters.status }}" data-order-filter-param="filter_status">
+                      <input type="hidden" name="filter_courier_id" value="{{ filters.courier_id }}" data-order-filter-param="filter_courier_id">
+                      <input type="hidden" name="return_url" value="{{ return_url }}" data-order-return-input>
+                      <div class="field">
+                        <label for="cash-{{ order.id }}">Наличные</label>
+                        <input id="cash-{{ order.id }}" name="cash_amount" inputmode="decimal" placeholder="0">
+                      </div>
+                      <div class="field">
+                        <label for="card-{{ order.id }}">Карта</label>
+                        <input id="card-{{ order.id }}" name="card_amount" inputmode="decimal" placeholder="0">
+                      </div>
+                      <button class="primary-btn" type="submit">Оплатить</button>
+                    </form>
+                  </details>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+
+  <section class="cards" aria-label="Заявки" data-order-filter-results>
+    {% for order in orders %}
+      {% set pay_status = payment_status_for_order(order) %}
+      {% set order_search = order.order_code ~ ' ' ~ (order.cargo_number or '') ~ ' ' ~ order.client_name_snapshot ~ ' ' ~ order.client_phone_snapshot ~ ' ' ~ order.address ~ ' ' ~ (order.courier.full_name if order.courier else "Не назначен") %}
+      {% set pickup_copy_text = order.order_code ~ ' ' ~ (order.places_count if order.places_count is not none else 'мест не указано') ~ ' номер груза ' ~ (order.cargo_number or 'не указан') ~ ' номер карго ' ~ (order.cargo_phone or 'не указан') %}
+      <article class="order-card" data-order-filter-item data-order-id="{{ order.id }}" data-order-search="{{ order_search|e }}" data-order-index="{{ loop.index0 }}" data-order-number="{{ order.order_number }}" data-order-date="{{ order.delivery_date.isoformat() if order.delivery_date else '' }}" data-order-courier="{{ order.courier.full_name if order.courier else '' }}" data-order-courier-id="{{ order.courier_id or '' }}" data-order-payment="{{ pay_status.value }}" data-order-status="{{ order.status.value }}">
+        {% if user.role.value == "admin" %}<div class="order-card-select"><label class="order-check-label"><input type="checkbox" class="order-row-check" name="order_ids" value="{{ order.id }}" form="orders-bulk-form" aria-label="Выбрать заявку {{ order.order_code }}"> <span>Выбрать</span></label></div>{% endif %}
+        <div class="order-card-head">
+          <div>
+            <div class="meta-label">№ заявки</div>
+            <div class="card-number">{{ order.order_code }}</div>
+          </div>
+          <div>
+            <div class="meta-label">Дата доставки</div>
+            <div class="meta-value">{{ order.delivery_date|ru_date }}</div>
+          </div>
+        </div>
+
+        <div class="order-card-cargo">
+          <span class="cargo-pill">{{ order.cargo_number or "Не указан" }}</span>
+        </div>
+
+        <div class="order-card-specs cargo-specs" aria-label="Параметры груза">
+          <span>{% if order.places_count is not none %}Мест: {{ order.places_count }}{% else %}Мест не указано{% endif %}</span>
+          <span>{% if order.weight is not none %}Вес: {{ order.weight|order_number }} кг{% else %}Вес не указан{% endif %}</span>
+          <span>{% if order.volume is not none %}Объём: {{ order.volume|order_number }} м³{% else %}Объём не указан{% endif %}</span>
+        </div>
+
+        <div class="order-card-finance" aria-label="Стоимость и оплата">
+          <div>
+            <div class="meta-label">Стоимость</div>
+            <div class="meta-value amount">{{ order.delivery_cost|money }}</div>
+          </div>
+          <div>
+            <div class="meta-label">Оплата</div>
+            <div class="meta-value">
+              <span class="status {{ payment_status_class(pay_status) }}">{{ payment_status_label(pay_status) }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="order-card-status">
+          <div class="meta-label">Статус</div>
+          <form class="quick-status-form quick-status-form-card" method="post" action="/orders/{{ order.id }}/status">
+            <input type="hidden" name="q" value="{{ filters.q }}" data-order-filter-param="q">
+            <input type="hidden" name="sort" value="{{ filters.sort }}" data-order-filter-param="sort">
+            <input type="hidden" name="date_from" value="{{ filters.date_from }}" data-order-filter-param="date_from">
+            <input type="hidden" name="date_to" value="{{ filters.date_to }}" data-order-filter-param="date_to">
+            <input type="hidden" name="filter_status" value="{{ filters.status }}" data-order-filter-param="filter_status">
+            <input type="hidden" name="filter_courier_id" value="{{ filters.courier_id }}" data-order-filter-param="filter_courier_id">
+            <select name="status" aria-label="Статус заявки {{ order.order_code }}">
+              {% for status in statuses %}
+                <option value="{{ status.value }}" {% if order.status.value == status.value %}selected{% endif %}>
+                  {{ status|status_label }}
+                </option>
+              {% endfor %}
+              <option value="{{ archive_status_action }}">Отменить</option>
+            </select>
+            <select class="quick-status-courier" name="courier_id" aria-label="Курьер заявки {{ order.order_code }}" {% if order.status.value != "at_courier" %}hidden disabled{% endif %}>
+              <option value="">Выберите курьера</option>
+              {% for courier in couriers %}
+                <option value="{{ courier.id }}" {% if order.courier_id == courier.id %}selected{% endif %}>{{ courier.full_name }}</option>
+              {% endfor %}
+            </select>
+            <button class="quick-status-submit" type="submit" aria-label="Сохранить статус" title="Сохранить статус">&#10003;</button>
+          </form>
+          {% if order.status.value == "at_courier" %}
+            <div class="status-courier-note">Курьер: <span>{{ order.courier.full_name if order.courier else "Не назначен" }}</span></div>
+          {% endif %}
+        </div>
+
+        <div class="order-card-fields">
+          <div>
+            <div class="meta-label">Адрес доставки</div>
+            <div class="meta-value">{{ order.address }}</div>
+          </div>
+          <div>
+            <div class="meta-label">Телефон клиента</div>
+            <div class="meta-value">{{ order.client_phone_snapshot }}</div>
+          </div>
+          <div>
+            <div class="meta-label">ФИО клиента</div>
+            <div class="meta-value card-client">{{ order.client_name_snapshot }}</div>
+            {% if order.client and order.client.notes %}
+              <div class="client-note-inline">{{ order.client.notes }}</div>
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="card-actions order-card-actions">
+          <a class="card-btn" href="/orders/{{ order.id }}?{{ return_url_param }}" data-order-return-link data-base-href="/orders/{{ order.id }}">Открыть</a>
+          <a class="card-btn" href="/orders/{{ order.id }}/edit?{{ return_url_param }}" data-order-return-link data-base-href="/orders/{{ order.id }}/edit">Изменить</a>
+          <div class="copy-pickup-wrap">
+            <button class="card-btn copy-pickup-btn" type="button" data-pickup-copy data-pickup-copy-text="{{ pickup_copy_text|e }}">Копировать</button>
+            <span class="copy-pickup-status" data-pickup-copy-status aria-live="polite"></span>
+          </div>
+          {% if pay_status.value != "paid" %}
+            <details class="quick-pay quick-pay-card">
+              <summary>Оплатить</summary>
+              <form class="quick-pay-form" method="post" action="/orders/{{ order.id }}/quick-pay">
+                <input type="hidden" name="q" value="{{ filters.q }}" data-order-filter-param="q">
+                <input type="hidden" name="sort" value="{{ filters.sort }}" data-order-filter-param="sort">
+                <input type="hidden" name="date_from" value="{{ filters.date_from }}" data-order-filter-param="date_from">
+                <input type="hidden" name="date_to" value="{{ filters.date_to }}" data-order-filter-param="date_to">
+                <input type="hidden" name="filter_status" value="{{ filters.status }}" data-order-filter-param="filter_status">
+                <input type="hidden" name="filter_courier_id" value="{{ filters.courier_id }}" data-order-filter-param="filter_courier_id">
+                <input type="hidden" name="return_url" value="{{ return_url }}" data-order-return-input>
+                <div class="field">
+                  <label for="card-cash-{{ order.id }}">Наличные</label>
+                  <input id="card-cash-{{ order.id }}" name="cash_amount" inputmode="decimal" placeholder="0">
+                </div>
+                <div class="field">
+                  <label for="card-card-{{ order.id }}">Карта</label>
+                  <input id="card-card-{{ order.id }}" name="card_amount" inputmode="decimal" placeholder="0">
+                </div>
+                <button class="primary-btn" type="submit">Оплатить</button>
+              </form>
+            </details>
+          {% endif %}
+        </div>
+      </article>
+    {% endfor %}
+  </section>
+  <div class="empty-note" data-order-filter-empty hidden>Заявки не найдены. Проверьте номер, клиента, телефон, адрес или курьера.</div>
+{% else %}
+  {% if filters_active %}
+    <div class="empty-note">Заявки не найдены. Проверьте номер, клиента, телефон, адрес или курьера.</div>
+  {% else %}
+    <div class="empty-note">Заявок пока нет. Создайте первую заявку.</div>
+  {% endif %}
+{% endif %}
+
+<script>
+  const orderFilterForm = document.querySelector('[data-order-filter-form]');
+  const orderFilterInput = document.querySelector('[data-order-filter-input]');
+  const orderFilterReset = document.querySelector('[data-order-filter-reset]');
+  const orderSortSelect = document.querySelector('[data-order-sort]');
+  const orderDateFromInput = document.querySelector('[data-order-date-from]');
+  const orderDateToInput = document.querySelector('[data-order-date-to]');
+  const orderStatusFilter = document.querySelector('[data-order-status-filter]');
+  const orderCourierFilter = document.querySelector('[data-order-courier-filter]');
+  const orderCourierFilterField = document.querySelector('[data-order-courier-filter-field]');
+  const orderFilterCount = document.querySelector('[data-order-filter-count]');
+  const orderFilterEmpty = document.querySelector('[data-order-filter-empty]');
+  const orderFilterResults = Array.from(document.querySelectorAll('[data-order-filter-results]'));
+  const orderFilterItems = Array.from(document.querySelectorAll('[data-order-filter-item]'));
+  const orderFilterControls = Array.from(document.querySelectorAll('[data-order-filter-control]'));
+  const orderPreservedParams = Array.from(document.querySelectorAll('[data-order-filter-param]'));
+  const orderReturnLinks = Array.from(document.querySelectorAll('[data-order-return-link]'));
+  const orderReturnInputs = Array.from(document.querySelectorAll('[data-order-return-input]'));
+  const pickupCopyButtons = Array.from(document.querySelectorAll('[data-pickup-copy]'));
+
+  const normalizeOrderText = (value) => String(value || "").toLocaleLowerCase("ru-RU").replace(/\s+/g, " ").trim();
+  const digitsOnly = (value) => String(value || "").replace(/\D/g, "");
+  const phoneTerms = (digits) => {
+    const terms = [digits];
+    if (digits.length === 10) {
+      terms.push(`7${digits}`);
+    } else if (digits.length === 11 && digits.startsWith("8")) {
+      terms.push(`7${digits.slice(1)}`);
+    }
+    return Array.from(new Set(terms.filter(Boolean)));
+  };
+
+  const itemCache = orderFilterItems.map((item) => {
+    const search = item.dataset.orderSearch || "";
+    return {
+      element: item,
+      id: item.dataset.orderId,
+      text: normalizeOrderText(search),
+      digits: digitsOnly(search),
+      index: Number(item.dataset.orderIndex),
+      number: Number(item.dataset.orderNumber),
+      date: item.dataset.orderDate || "",
+      courier: normalizeOrderText(item.dataset.orderCourier || ""),
+      courierId: item.dataset.orderCourierId || "",
+      payment: item.dataset.orderPayment || "",
+      status: item.dataset.orderStatus || "",
+    };
+  });
+
+  const currentOrderFilters = () => ({
+    q: orderFilterInput ? orderFilterInput.value.trim() : "",
+    sort: orderSortSelect ? orderSortSelect.value : "newest",
+    date_from: orderDateFromInput ? orderDateFromInput.value : "",
+    date_to: orderDateToInput ? orderDateToInput.value : "",
+    filter_status: orderStatusFilter ? orderStatusFilter.value : "",
+    filter_courier_id: orderCourierFilter ? orderCourierFilter.value : "",
+  });
+
+  const syncOrderCourierFilter = (options = {}) => {
+    if (!orderStatusFilter || !orderCourierFilter || !orderCourierFilterField) return;
+    const showCourier = orderStatusFilter.value === "at_courier" || orderStatusFilter.value === "delivered";
+    orderCourierFilterField.hidden = !showCourier;
+    if (!showCourier && options.clear !== false) {
+      orderCourierFilter.value = "";
+    }
+  };
+
+  const syncPreservedOrderFilters = () => {
+    const current = currentOrderFilters();
+    const returnUrl = orderFilterUrl();
+    orderPreservedParams.forEach((input) => {
+      if (Object.prototype.hasOwnProperty.call(current, input.dataset.orderFilterParam)) {
+        input.value = current[input.dataset.orderFilterParam];
+      }
+    });
+    orderReturnInputs.forEach((input) => {
+      input.value = returnUrl;
+    });
+    orderReturnLinks.forEach((link) => {
+      const baseHref = link.dataset.baseHref || link.getAttribute("href") || "";
+      if (!baseHref) return;
+      link.setAttribute("href", `${baseHref}?return_url=${encodeURIComponent(returnUrl)}`);
+    });
+  };
+
+  const hasActiveOrderFilters = () => {
+    const current = currentOrderFilters();
+    return Boolean(
+      current.q ||
+      current.date_from ||
+      current.date_to ||
+      current.filter_status ||
+      current.filter_courier_id ||
+      current.sort !== "newest"
+    );
+  };
+
+  const hasServerScopedOrderFilters = () => {
+    const current = currentOrderFilters();
+    return Boolean(current.date_from || current.date_to || current.filter_status || current.filter_courier_id);
+  };
+
+  const orderFilterUrl = () => {
+    const current = currentOrderFilters();
+    const params = new URLSearchParams();
+    if (current.q) params.set("q", current.q);
+    if (current.sort && current.sort !== "newest") params.set("sort", current.sort);
+    if (current.date_from) params.set("date_from", current.date_from);
+    if (current.date_to) params.set("date_to", current.date_to);
+    if (current.filter_status) params.set("status", current.filter_status);
+    if (current.filter_courier_id) params.set("courier_id", current.filter_courier_id);
+    const query = params.toString();
+    return query ? `/orders?${query}` : "/orders";
+  };
+
+  const compareOrderItems = (left, right) => {
+    const sort = orderSortSelect ? orderSortSelect.value : "newest";
+    const paymentRank = { pending: 0, partial: 1, paid: 2 };
+    const statusRank = { in_work: 0, at_courier: 1, delivered: 2 };
+
+    if (sort === "number" && left.number !== right.number) {
+      return left.number - right.number;
+    }
+    if (sort === "delivery_date" && left.date !== right.date) {
+      if (!left.date) return 1;
+      if (!right.date) return -1;
+      return left.date.localeCompare(right.date);
+    }
+    if (sort === "courier" && left.courier !== right.courier) {
+      if (!left.courier) return 1;
+      if (!right.courier) return -1;
+      return left.courier.localeCompare(right.courier, "ru");
+    }
+    if (sort === "courier" && left.date !== right.date) {
+      if (!left.date) return 1;
+      if (!right.date) return -1;
+      return left.date.localeCompare(right.date);
+    }
+    if (sort === "courier" && left.number !== right.number) {
+      return left.number - right.number;
+    }
+    if (sort === "payment" && left.payment !== right.payment) {
+      return (paymentRank[left.payment] ?? 99) - (paymentRank[right.payment] ?? 99);
+    }
+    if (sort === "status" && left.status !== right.status) {
+      return (statusRank[left.status] ?? 99) - (statusRank[right.status] ?? 99);
+    }
+    return left.index - right.index;
+  };
+
+  const sortOrderItems = () => {
+    const containers = new Set(itemCache.map((item) => item.element.parentElement).filter(Boolean));
+    containers.forEach((container) => {
+      itemCache
+        .filter((item) => item.element.parentElement === container)
+        .sort(compareOrderItems)
+        .forEach((item) => container.appendChild(item.element));
+    });
+  };
+
+  const applyOrderView = () => {
+    sortOrderItems();
+    const query = normalizeOrderText(orderFilterInput.value);
+    const queryDigits = digitsOnly(query);
+    const queryPhoneTerms = phoneTerms(queryDigits);
+    const current = currentOrderFilters();
+    const visibleIds = new Set();
+
+    itemCache.forEach((item) => {
+      const textMatch = !query || item.text.includes(query);
+      const phoneMatch = Boolean(queryDigits) && queryPhoneTerms.some((term) => item.digits.includes(term));
+      const dateFromMatch = !current.date_from || (item.date && item.date >= current.date_from);
+      const dateToMatch = !current.date_to || (item.date && item.date <= current.date_to);
+      const statusMatch = !current.filter_status || item.status === current.filter_status;
+      const courierMatch = !current.filter_courier_id || item.courierId === current.filter_courier_id;
+      const searchMatch = textMatch || phoneMatch;
+      const isVisible = searchMatch && dateFromMatch && dateToMatch && statusMatch && courierMatch;
+      item.element.hidden = !isVisible;
+      if (isVisible && item.id) {
+        visibleIds.add(item.id);
+      }
+    });
+
+    if (orderFilterCount) {
+      orderFilterCount.textContent = String(visibleIds.size);
+    }
+    if (orderFilterEmpty) {
+      orderFilterEmpty.hidden = visibleIds.size > 0;
+    }
+    orderFilterResults.forEach((resultBlock) => {
+      resultBlock.hidden = visibleIds.size === 0;
+    });
+    if (orderFilterReset) {
+      orderFilterReset.hidden = !hasActiveOrderFilters();
+    }
+    syncPreservedOrderFilters();
+  };
+
+  if (orderFilterForm && orderFilterInput) {
+    orderFilterForm.addEventListener("submit", (event) => {
+      syncPreservedOrderFilters();
+      if (hasServerScopedOrderFilters() || orderFilterForm.dataset.serverFiltered === "true") {
+        event.preventDefault();
+        window.location.assign(orderFilterUrl());
+        return;
+      }
+      event.preventDefault();
+      applyOrderView();
+    });
+    orderFilterInput.addEventListener("input", applyOrderView);
+    if (orderSortSelect) {
+      orderSortSelect.addEventListener("change", applyOrderView);
+    }
+    orderFilterControls.forEach((control) => {
+      control.addEventListener("change", () => {
+        if (control === orderStatusFilter) {
+          syncOrderCourierFilter();
+        }
+        syncPreservedOrderFilters();
+        if (orderFilterForm.requestSubmit) {
+          orderFilterForm.requestSubmit();
+        } else {
+          orderFilterForm.submit();
+        }
+      });
+    });
+    syncOrderCourierFilter({ clear: false });
+    applyOrderView();
+  }
+
+  const fallbackCopyText = (text) => {
+    const textarea = document.createElement("textarea");
+    textarea.value = text;
+    textarea.setAttribute("readonly", "");
+    textarea.style.position = "fixed";
+    textarea.style.left = "-9999px";
+    textarea.style.top = "0";
+    document.body.appendChild(textarea);
+    textarea.select();
+    const copied = document.execCommand("copy");
+    textarea.remove();
+    if (!copied) {
+      throw new Error("copy failed");
+    }
+  };
+
+  const copyPickupText = async (text) => {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+      return;
+    }
+    fallbackCopyText(text);
+  };
+
+  const setPickupStatus = (button, text) => {
+    const status = button.closest(".copy-pickup-wrap")?.querySelector("[data-pickup-copy-status]");
+    if (!status) return;
+
+    status.textContent = text;
+    window.clearTimeout(Number(status.dataset.clearTimer || 0));
+    status.dataset.clearTimer = String(window.setTimeout(() => {
+      status.textContent = "";
+      status.dataset.clearTimer = "";
+    }, 1800));
+  };
+
+  pickupCopyButtons.forEach((button) => {
+    button.addEventListener("click", async () => {
+      const text = button.dataset.pickupCopyText || "";
+      if (!text) return;
+
+      button.disabled = true;
+      try {
+        await copyPickupText(text);
+        setPickupStatus(button, "Скопировано");
+      } catch (error) {
+        setPickupStatus(button, "Не скопировано");
+      } finally {
+        button.disabled = false;
+      }
+    });
+  });
+
+  const quickStatusForms = Array.from(document.querySelectorAll('.quick-status-form'));
+  const quickStatusCancelModal = document.querySelector('[data-quick-status-cancel-modal]');
+  const quickStatusCancelDialog = quickStatusCancelModal?.querySelector('.crm-modal-dialog');
+  const quickStatusCancelConfirm = quickStatusCancelModal?.querySelector('[data-quick-status-cancel-confirm]');
+  const quickStatusCancelClose = Array.from(document.querySelectorAll('[data-quick-status-cancel-close]'));
+  let pendingCancelForm = null;
+  let lastQuickStatusFocus = null;
+
+  const toggleCourierSelect = (form) => {
+    const statusSelect = form.querySelector('select[name="status"]');
+    const courierSelect = form.querySelector('select[name="courier_id"]');
+    if (!statusSelect || !courierSelect) {
+      return;
+    }
+    const needsCourier = statusSelect.value === "at_courier";
+    courierSelect.hidden = !needsCourier;
+    courierSelect.disabled = !needsCourier;
+  };
+
+  const restoreQuickStatusSelection = () => {
+    if (!pendingCancelForm) return;
+
+    const statusSelect = pendingCancelForm.querySelector('select[name="status"]');
+    if (statusSelect) {
+      statusSelect.value = pendingCancelForm.dataset.previousStatus || statusSelect.value;
+    }
+    toggleCourierSelect(pendingCancelForm);
+  };
+
+  const openQuickStatusCancelModal = (form) => {
+    if (!quickStatusCancelModal || !quickStatusCancelDialog) return false;
+
+    pendingCancelForm = form;
+    lastQuickStatusFocus = document.activeElement;
+    quickStatusCancelModal.hidden = false;
+    quickStatusCancelModal.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('modal-open');
+    quickStatusCancelDialog.focus();
+    return true;
+  };
+
+  const closeQuickStatusCancelModal = () => {
+    if (!quickStatusCancelModal) return;
+
+    quickStatusCancelModal.hidden = true;
+    quickStatusCancelModal.setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('modal-open');
+    restoreQuickStatusSelection();
+    pendingCancelForm = null;
+    if (lastQuickStatusFocus && typeof lastQuickStatusFocus.focus === 'function') {
+      lastQuickStatusFocus.focus();
+    }
+  };
+
+  quickStatusForms.forEach((form) => {
+    const statusSelect = form.querySelector('select[name="status"]');
+    toggleCourierSelect(form);
+    if (statusSelect) {
+      form.dataset.previousStatus = statusSelect.value;
+      statusSelect.addEventListener("change", () => {
+        toggleCourierSelect(form);
+        if (statusSelect.value !== "{{ archive_status_action }}") {
+          form.dataset.previousStatus = statusSelect.value;
+        }
+      });
+    }
+    form.addEventListener("submit", (event) => {
+      if (form.dataset.confirmedArchive === "true") return;
+      if (statusSelect?.value === "{{ archive_status_action }}") {
+        event.preventDefault();
+        if (!openQuickStatusCancelModal(form)) {
+          form.dataset.confirmedArchive = "true";
+          form.submit();
+        }
+      }
+    });
+  });
+
+  quickStatusCancelClose.forEach((button) => {
+    button.addEventListener('click', closeQuickStatusCancelModal);
+  });
+
+  quickStatusCancelConfirm?.addEventListener('click', () => {
+    if (!pendingCancelForm) return;
+
+    pendingCancelForm.dataset.confirmedArchive = "true";
+    if (pendingCancelForm.requestSubmit) {
+      pendingCancelForm.requestSubmit();
+    } else {
+      pendingCancelForm.submit();
+    }
+  });
+
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && quickStatusCancelModal && !quickStatusCancelModal.hidden) {
+      closeQuickStatusCancelModal();
+    }
+  });
+
+  // Массовое удаление заявок (только для admin)
+  const bulkForm = document.getElementById('orders-bulk-form');
+  if (bulkForm) {
+    const orderChecks = Array.from(document.querySelectorAll('.order-row-check'));
+    const selectAll = document.getElementById('orders-select-all');
+    const bulkBar = document.querySelector('[data-bulk-bar]');
+    const bulkCount = document.querySelector('[data-bulk-count]');
+    const bulkDeleteBtn = document.querySelector('[data-bulk-delete]');
+    const bulkSelectAllBtn = document.querySelector('[data-bulk-select-all]');
+    const bulkClearBtn = document.querySelector('[data-bulk-clear]');
+    const bulkModal = document.querySelector('[data-bulk-delete-modal]');
+    const bulkDialog = bulkModal ? bulkModal.querySelector('.crm-modal-dialog') : null;
+    const bulkCloseEls = Array.from(document.querySelectorAll('[data-bulk-delete-close]'));
+    let bulkLastFocus = null;
+
+    const visibleChecks = () => orderChecks.filter((check) => {
+      const item = check.closest('[data-order-filter-item]');
+      return !item || !item.hidden;
+    });
+    const checkedCount = () => new Set(orderChecks.filter((check) => check.checked).map((check) => check.value)).size;
+
+    const syncBulkBar = () => {
+      const count = checkedCount();
+      if (bulkCount) {
+        bulkCount.textContent = String(count);
+      }
+      if (bulkBar) {
+        bulkBar.hidden = count === 0;
+      }
+      if (selectAll) {
+        const visible = visibleChecks();
+        selectAll.checked = visible.length > 0 && visible.every((check) => check.checked);
+      }
+    };
+
+    const openBulkModal = () => {
+      if (!bulkModal || !bulkDialog) {
+        if (bulkForm.requestSubmit) {
+          bulkForm.requestSubmit();
+        } else {
+          bulkForm.submit();
+        }
+        return;
+      }
+      bulkLastFocus = document.activeElement;
+      bulkModal.hidden = false;
+      bulkModal.setAttribute('aria-hidden', 'false');
+      document.body.classList.add('modal-open');
+      bulkDialog.focus();
+    };
+
+    const closeBulkModal = () => {
+      if (!bulkModal) return;
+      bulkModal.hidden = true;
+      bulkModal.setAttribute('aria-hidden', 'true');
+      document.body.classList.remove('modal-open');
+      if (bulkLastFocus && typeof bulkLastFocus.focus === 'function') {
+        bulkLastFocus.focus();
+      }
+    };
+
+    orderChecks.forEach((check) => check.addEventListener('change', syncBulkBar));
+    if (selectAll) {
+      selectAll.addEventListener('change', () => {
+        const checked = selectAll.checked;
+        visibleChecks().forEach((check) => { check.checked = checked; });
+        syncBulkBar();
+      });
+    }
+    if (bulkSelectAllBtn) {
+      bulkSelectAllBtn.addEventListener('click', () => {
+        visibleChecks().forEach((check) => { check.checked = true; });
+        syncBulkBar();
+      });
+    }
+    if (bulkClearBtn) {
+      bulkClearBtn.addEventListener('click', () => {
+        orderChecks.forEach((check) => { check.checked = false; });
+        syncBulkBar();
+      });
+    }
+    if (bulkDeleteBtn) {
+      bulkDeleteBtn.addEventListener('click', openBulkModal);
+    }
+    bulkCloseEls.forEach((element) => element.addEventListener('click', closeBulkModal));
+
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && bulkModal && !bulkModal.hidden) {
+        closeBulkModal();
+      }
+    });
+
+    syncBulkBar();
+  }
+</script>
+{% endblock %}

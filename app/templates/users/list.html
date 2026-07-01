@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+
+{% block title %}Сотрудники{% endblock %}
+{% block wrap_class %} simple-list-wrap{% endblock %}
+
+{% block content %}
+<section class="topbar">
+  <div class="title-block">
+    <h1>Сотрудники</h1>
+    <p>Доступы менеджеров, курьеров и администраторов.</p>
+  </div>
+  <a class="primary-btn" href="/users/new">Создать сотрудника</a>
+</section>
+
+{% if success_message %}
+  <div class="alert alert-success" role="status">{{ success_message }}</div>
+{% endif %}
+
+{% if users %}
+  <section class="table-wrap">
+    <table class="users-table">
+      <thead>
+        <tr>
+          <th>ФИО</th>
+          <th>Логин</th>
+          <th>Телефон</th>
+          <th>Роль</th>
+          <th>Статус</th>
+          <th>Действия</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in users %}
+          <tr>
+            <td><div class="client">{{ item.full_name }}</div></td>
+            <td>{{ item.email }}</td>
+            <td>{{ item.phone or "Не указан" }}</td>
+            <td>{{ role_label(item.role) }}</td>
+            <td>
+              {% if item.is_active %}
+                <span class="status status-paid">Активен</span>
+              {% else %}
+                <span class="status status-wait">Не активен</span>
+              {% endif %}
+            </td>
+            <td>
+              <a class="action-link" href="/users/{{ item.id }}/edit">Изменить</a>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+
+  <section class="cards" aria-label="Сотрудники">
+    {% for item in users %}
+      <article class="user-card">
+        <div class="card-top">
+          <div>
+            <div class="card-client">{{ item.full_name }}</div>
+            <div class="subtle">{{ item.email }}</div>
+          </div>
+          {% if item.is_active %}
+            <span class="status status-paid">Активен</span>
+          {% else %}
+            <span class="status status-wait">Не активен</span>
+          {% endif %}
+        </div>
+        <div class="card-grid">
+          <div>
+            <div class="meta-label">Телефон</div>
+            <div class="meta-value">{{ item.phone or "Не указан" }}</div>
+          </div>
+          <div>
+            <div class="meta-label">Роль</div>
+            <div class="meta-value">{{ role_label(item.role) }}</div>
+          </div>
+        </div>
+        <div class="card-actions">
+          <a class="card-btn" href="/users/{{ item.id }}/edit">Изменить</a>
+        </div>
+      </article>
+    {% endfor %}
+  </section>
+{% else %}
+  <div class="empty-note">Сотрудников пока нет.</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+
+{% block title %}Клиенты{% endblock %}
+{% block wrap_class %} simple-list-wrap{% endblock %}
+
+{% block content %}
+<section class="topbar">
+  <div class="title-block">
+    <h1>Клиенты</h1>
+    <p>База клиентов и история заявок.</p>
+  </div>
+  <a class="primary-btn" href="/clients/new">Создать клиента</a>
+</section>
+
+<form class="filters" method="get" action="/clients" data-client-filter-form data-server-filtered="{% if query %}true{% else %}false{% endif %}">
+  <div class="filters-grid">
+    <div class="field">
+      <label for="client-search">Поиск</label>
+      <input id="client-search" name="q" type="search" value="{{ query }}" placeholder="ФИО или телефон" autocomplete="off" data-client-filter-input>
+    </div>
+    <a class="secondary-btn" href="/clients" data-client-filter-reset {% if not query %}hidden{% endif %}>Сброс</a>
+  </div>
+</form>
+
+<div class="result-note" data-client-filter-result>
+  Найдено клиентов: <span data-client-filter-count>{{ clients|length }}</span>
+</div>
+
+{% if clients %}
+  <section class="table-wrap" data-client-filter-results>
+    <table class="clients-table">
+      <thead>
+        <tr>
+          <th>Клиент</th>
+          <th>Телефон</th>
+          <th>Создан</th>
+          <th>Заявки</th>
+          <th>Действия</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for client in clients %}
+          <tr data-client-filter-item data-client-id="{{ client.id }}" data-client-search="{{ (client.full_name ~ ' ' ~ client.phone)|e }}">
+            <td><a class="client" href="/clients/{{ client.id }}">{{ client.full_name }}</a></td>
+            <td>{{ client.phone|phone }}</td>
+            <td>{{ client.created_at|ru_datetime }}</td>
+            <td>{{ client.orders|length }}</td>
+            <td>
+              <div class="row-actions table-actions">
+                <a class="action-link" href="/clients/{{ client.id }}">Открыть</a>
+                <a class="action-link" href="/clients/{{ client.id }}/edit">Изменить</a>
+              </div>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+
+  <section class="cards" aria-label="Клиенты" data-client-filter-results>
+    {% for client in clients %}
+      <article class="client-card" data-client-filter-item data-client-id="{{ client.id }}" data-client-search="{{ (client.full_name ~ ' ' ~ client.phone)|e }}">
+        <div class="card-top">
+          <div>
+            <a class="card-client" href="/clients/{{ client.id }}">{{ client.full_name }}</a>
+            <div class="subtle">{{ client.phone|phone }}</div>
+          </div>
+        </div>
+        <div class="card-grid">
+          <div>
+            <div class="meta-label">Создан</div>
+            <div class="meta-value">{{ client.created_at|ru_datetime }}</div>
+          </div>
+        </div>
+        <div class="client-card-stats" aria-label="Заявки клиента">
+          <div>
+            <div class="meta-label">Всего заявок</div>
+            <div class="meta-value">{{ client_total_orders_count(client) }}</div>
+          </div>
+          <div>
+            <div class="meta-label">В работе</div>
+            <div class="meta-value">{{ client_in_work_orders_count(client) }}</div>
+          </div>
+        </div>
+        <div class="card-actions">
+          <a class="card-btn" href="/clients/{{ client.id }}">Открыть</a>
+          <a class="card-btn" href="/clients/{{ client.id }}/edit">Изменить</a>
+        </div>
+      </article>
+    {% endfor %}
+  </section>
+  <div class="empty-note" data-client-filter-empty hidden>Клиенты не найдены. Проверьте ФИО или телефон.</div>
+{% else %}
+  {% if query %}
+    <div class="empty-note">Клиенты не найдены. Проверьте ФИО или телефон.</div>
+  {% else %}
+    <div class="empty-note">Клиентов пока нет. Создайте первого клиента.</div>
+  {% endif %}
+{% endif %}
+
+<script>
+  const clientFilterForm = document.querySelector("[data-client-filter-form]");
+  const clientFilterInput = document.querySelector("[data-client-filter-input]");
+  const clientFilterReset = document.querySelector("[data-client-filter-reset]");
+  const clientFilterCount = document.querySelector("[data-client-filter-count]");
+  const clientFilterEmpty = document.querySelector("[data-client-filter-empty]");
+  const clientFilterResults = Array.from(document.querySelectorAll("[data-client-filter-results]"));
+  const clientFilterItems = Array.from(document.querySelectorAll("[data-client-filter-item]"));
+
+  const normalizeClientText = (value) => String(value || "").toLocaleLowerCase("ru-RU").replace(/\s+/g, " ").trim();
+  const clientDigitsOnly = (value) => String(value || "").replace(/\D/g, "");
+  const clientPhoneTerms = (digits) => {
+    const terms = [digits];
+    if (digits.length === 10) {
+      terms.push(`7${digits}`);
+    } else if (digits.length === 11 && digits.startsWith("8")) {
+      terms.push(`7${digits.slice(1)}`);
+    }
+    return Array.from(new Set(terms.filter(Boolean)));
+  };
+
+  const clientItemCache = clientFilterItems.map((item) => {
+    const search = item.dataset.clientSearch || "";
+    return {
+      element: item,
+      id: item.dataset.clientId,
+      text: normalizeClientText(search),
+      digits: clientDigitsOnly(search),
+    };
+  });
+
+  const applyClientFilter = () => {
+    const query = normalizeClientText(clientFilterInput.value);
+    const queryDigits = clientDigitsOnly(query);
+    const queryPhoneTerms = clientPhoneTerms(queryDigits);
+    const visibleIds = new Set();
+
+    clientItemCache.forEach((item) => {
+      const textMatch = !query || item.text.includes(query);
+      const phoneMatch = Boolean(queryDigits) && queryPhoneTerms.some((term) => item.digits.includes(term));
+      const isVisible = textMatch || phoneMatch;
+      item.element.hidden = !isVisible;
+      if (isVisible && item.id) {
+        visibleIds.add(item.id);
+      }
+    });
+
+    if (clientFilterCount) {
+      clientFilterCount.textContent = String(visibleIds.size);
+    }
+    if (clientFilterEmpty) {
+      clientFilterEmpty.hidden = visibleIds.size > 0;
+    }
+    clientFilterResults.forEach((resultBlock) => {
+      resultBlock.hidden = visibleIds.size === 0;
+    });
+    if (clientFilterReset) {
+      clientFilterReset.hidden = query.length === 0;
+    }
+  };
+
+  if (clientFilterForm && clientFilterInput) {
+    clientFilterForm.addEventListener("submit", (event) => {
+      event.preventDefault();
+      applyClientFilter();
+    });
+    clientFilterInput.addEventListener("input", applyClientFilter);
+    if (clientFilterReset) {
+      clientFilterReset.addEventListener("click", (event) => {
+        if (clientFilterForm.dataset.serverFiltered === "true") {
+          return;
+        }
+        event.preventDefault();
+        clientFilterInput.value = "";
+        clientFilterInput.focus();
+        applyClientFilter();
+      });
+    }
+    applyClientFilter();
+  }
+</script>
+{% endblock %}

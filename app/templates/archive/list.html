@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+
+{% block title %}Архив{% endblock %}
+{% block wrap_class %} work-page-wrap{% endblock %}
+
+{% block content %}
+<section class="topbar">
+  <div class="title-block">
+    <h1>Архив</h1>
+    <p>Здесь хранятся заявки, которые убрали из рабочего списка.</p>
+  </div>
+</section>
+
+<section class="summary">
+  <div class="summary-card">
+    <div class="summary-label">В архиве</div>
+    <div class="summary-value">{{ archived_count }}</div>
+    <div class="summary-note">Можно открыть и восстановить</div>
+  </div>
+</section>
+
+{% if duplicate_cargo_order %}
+  <div class="alert alert-danger" role="alert">
+    Не удалось восстановить. Заявка с таким номером груза уже есть:
+    <a class="action-link" href="/orders/{{ duplicate_cargo_order.id }}">{{ duplicate_cargo_order.order_code }}</a>
+  </div>
+{% endif %}
+
+{% if orders %}
+  <section class="table-wrap archive-table-wrap">
+    <table class="orders-table archive-table">
+      <colgroup>
+        <col class="archive-col-code">
+        <col class="archive-col-client">
+        <col class="archive-col-phone">
+        <col class="archive-col-address">
+        <col class="archive-col-date">
+        <col class="archive-col-courier">
+        <col class="archive-col-cost">
+        <col class="archive-col-status">
+        <col class="archive-col-archived">
+        <col class="archive-col-actions">
+      </colgroup>
+      <thead>
+        <tr>
+          <th>Номер</th>
+          <th>Клиент</th>
+          <th>Телефон</th>
+          <th>Адрес</th>
+          <th>Дата</th>
+          <th>Курьер</th>
+          <th>Стоимость</th>
+          <th>Статус</th>
+          <th>Архив</th>
+          <th>Действия</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for order in orders %}
+          <tr>
+            <td><span class="num">{{ order.order_code }}</span></td>
+            <td><div class="client">{{ order.client_name_snapshot }}</div></td>
+            <td>{{ order.client_phone_snapshot }}</td>
+            <td><div class="address">{{ order.address }}</div></td>
+            <td>{{ order.delivery_date|ru_date }}</td>
+            <td>{{ order.courier.full_name if order.courier else "Не назначен" }}</td>
+            <td><span class="amount">{{ order.delivery_cost|money }}</span></td>
+            <td>
+              <span class="status {{ order.status|status_class }}">{{ order.status|status_label }}</span>
+            </td>
+            <td>
+              <div>{{ order.archived_at|ru_date }}</div>
+              <div class="subtle">{{ order.archived_by.full_name if order.archived_by else "Не указан" }}</div>
+            </td>
+            <td>
+              <div class="archive-row-actions">
+                <a class="action-link" href="/orders/{{ order.id }}">Открыть</a>
+                <form method="post" action="/archive/{{ order.id }}/restore">
+                  <button class="action-link restore" type="submit">Восстановить</button>
+                </form>
+              </div>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+
+  <section class="cards" aria-label="Архив заявок">
+    {% for order in orders %}
+      <article class="order-card archive-card">
+        <div class="card-top">
+          <div>
+            <div class="card-number">{{ order.order_code }}</div>
+            <div class="card-client">{{ order.client_name_snapshot }}</div>
+          </div>
+          <span class="status {{ order.status|status_class }}">{{ order.status|status_label }}</span>
+        </div>
+        <div class="card-grid">
+          <div>
+            <div class="meta-label">Телефон</div>
+            <div class="meta-value">{{ order.client_phone_snapshot }}</div>
+          </div>
+          <div>
+            <div class="meta-label">Дата доставки</div>
+            <div class="meta-value">{{ order.delivery_date|ru_date }}</div>
+          </div>
+          <div>
+            <div class="meta-label">Курьер</div>
+            <div class="meta-value">{{ order.courier.full_name if order.courier else "Не назначен" }}</div>
+          </div>
+          <div>
+            <div class="meta-label">Стоимость</div>
+            <div class="meta-value amount">{{ order.delivery_cost|money }}</div>
+          </div>
+          <div>
+            <div class="meta-label">Адрес</div>
+            <div class="meta-value">{{ order.address }}</div>
+          </div>
+          <div>
+            <div class="meta-label">Архив</div>
+            <div class="meta-value">{{ order.archived_at|ru_datetime }}</div>
+          </div>
+        </div>
+        <div class="card-actions">
+          <a class="card-btn" href="/orders/{{ order.id }}">Открыть</a>
+          <form method="post" action="/archive/{{ order.id }}/restore">
+            <button class="card-btn restore" type="submit">Восстановить</button>
+          </form>
+        </div>
+      </article>
+    {% endfor %}
+  </section>
+{% else %}
+  <div class="empty-note">В архиве пока нет заявок.</div>
+{% endif %}
+{% endblock %}

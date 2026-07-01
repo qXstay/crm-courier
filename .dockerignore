@@ -1,0 +1,31 @@
+.git
+.venv
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Секреты и окружение
+.env
+.env.*
+!.env.example
+
+# Базы и дампы
+*.sqlite
+*.sqlite-*
+*.db
+*.dump
+
+# Приватные артефакты
+qa_artifacts/
+static-preview/
+docs/customer_feedback/
+docs/source/
+*.artifact.json
+
+# Агентские и тестовые папки
+.claude/
+.agents/
+.od-skills/
+.playwright-mcp/

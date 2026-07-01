@@ -1,0 +1,218 @@
+{% extends "base.html" %}
+
+{% block title %}Сдачи курьеров{% endblock %}
+{% block wrap_class %} work-page-wrap{% endblock %}
+
+{% block content %}
+<section class="topbar">
+  <div class="title-block">
+    <div class="crumbs">
+      <a href="/accounting">Бухгалтерия</a>
+      <span>•</span>
+      <span>Сдачи</span>
+    </div>
+    <h1>Сдачи курьеров</h1>
+    <p>Проверьте сумму и подтвердите или отклоните сдачу.</p>
+  </div>
+  <a class="secondary-btn" href="/accounting">К бухгалтерии</a>
+</section>
+
+<form class="filters" method="get" action="/accounting/handovers">
+  <div class="filters-grid handovers-filters">
+    <div class="field">
+      <label for="handover-status">Статус</label>
+      <select id="handover-status" name="handover_status">
+        <option value="">Все</option>
+        {% for status in statuses %}
+          <option value="{{ status.value }}" {% if filters.handover_status == status.value %}selected{% endif %}>
+            {{ handover_status_label(status) }}
+          </option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <label for="handover-courier">Курьер</label>
+      <select id="handover-courier" name="courier_id">
+        <option value="">Все</option>
+        {% for courier in couriers %}
+          <option value="{{ courier.id }}" {% if filters.courier_id == courier.id|string %}selected{% endif %}>{{ courier.full_name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <label for="handover-date-from">С даты</label>
+      <input id="handover-date-from" type="date" name="date_from" value="{{ filters.date_from }}">
+    </div>
+    <div class="field">
+      <label for="handover-date-to">По дату</label>
+      <input id="handover-date-to" type="date" name="date_to" value="{{ filters.date_to }}">
+    </div>
+    <button class="secondary-btn" type="submit">Показать</button>
+  </div>
+</form>
+
+{% if error %}
+  <div class="alert alert-danger">{{ error }}</div>
+{% endif %}
+
+<section class="summary summary-3 handovers-summary" aria-label="Сводка сдач">
+  <article class="summary-card">
+    <div class="summary-label">На проверке</div>
+    <div class="summary-value">{{ list_data.pending_count }}</div>
+    <div class="summary-note">{{ list_data.pending_total|money }}</div>
+  </article>
+  <article class="summary-card">
+    <div class="summary-label">Подтверждено</div>
+    <div class="summary-value">{{ list_data.confirmed_total|money }}</div>
+    <div class="summary-note">Засчитанные сдачи</div>
+  </article>
+  <article class="summary-card">
+    <div class="summary-label">Отклонено</div>
+    <div class="summary-value">{{ list_data.rejected_total|money }}</div>
+    <div class="summary-note">Не засчитывается</div>
+  </article>
+</section>
+
+<section class="panel section">
+  <div class="section-head">
+    <h2>{% if filters.handover_status == "pending" %}Сдачи на проверке{% else %}История сдач{% endif %}</h2>
+  </div>
+
+  {% if handovers %}
+    <div class="table-wrap">
+      <table class="handovers-table">
+        <thead>
+          <tr>
+            <th>Дата сдачи</th>
+            <th>Курьер</th>
+            <th>Период</th>
+            <th>Сумма</th>
+            <th>Статус</th>
+            <th>Кто отправил</th>
+            <th>Кто обработал</th>
+            <th>Комментарий</th>
+            <th>Действие</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for handover in handovers %}
+            <tr class="handover-row handover-row-{{ handover.status.value }}">
+              <td>{{ handover.created_at|ru_datetime }}</td>
+              <td><div class="client">{{ handover.courier.full_name }}</div></td>
+              <td>
+                {{ handover.period_start|ru_date }}
+                {% if handover.period_end != handover.period_start %} - {{ handover.period_end|ru_date }}{% endif %}
+              </td>
+              <td><span class="amount">{{ handover.amount|money }}</span></td>
+              <td><span class="status {{ handover_status_class(handover.status) }}">{{ handover_status_label(handover.status) }}</span></td>
+              <td>{{ handover.created_by.full_name if handover.created_by else "Система" }}</td>
+              <td>
+                {% if handover.confirmed_by %}
+                  <div>{{ handover.confirmed_by.full_name }}</div>
+                  <div class="subtle">{{ handover.confirmed_at|ru_datetime }}</div>
+                {% else %}
+                  <span class="subtle">Не обработано</span>
+                {% endif %}
+              </td>
+              <td><div class="handover-comment">{{ handover.comment or "" }}</div></td>
+              <td>
+                {% if handover.status.value == "pending" %}
+                  <div class="handover-actions">
+                    <form method="post" action="/accounting/handovers/{{ handover.id }}/confirm">
+                      <input type="hidden" name="handover_status" value="{{ filters.handover_status }}">
+                      <input type="hidden" name="courier_id" value="{{ filters.courier_id }}">
+                      <input type="hidden" name="date_from" value="{{ filters.date_from }}">
+                      <input type="hidden" name="date_to" value="{{ filters.date_to }}">
+                      <input name="comment" placeholder="Комментарий" aria-label="Комментарий">
+                      <button class="action-link restore" type="submit">Подтвердить</button>
+                    </form>
+                    <form method="post" action="/accounting/handovers/{{ handover.id }}/reject">
+                      <input type="hidden" name="handover_status" value="{{ filters.handover_status }}">
+                      <input type="hidden" name="courier_id" value="{{ filters.courier_id }}">
+                      <input type="hidden" name="date_from" value="{{ filters.date_from }}">
+                      <input type="hidden" name="date_to" value="{{ filters.date_to }}">
+                      <input name="comment" placeholder="Причина" aria-label="Причина отказа">
+                      <button class="danger-btn payment-delete" type="submit">Отклонить</button>
+                    </form>
+                  </div>
+                {% else %}
+                  <span class="subtle">Обработано</span>
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <section class="cards" aria-label="Сдачи курьеров">
+      {% for handover in handovers %}
+        <article class="payment-card handover-card handover-card-{{ handover.status.value }}">
+          <div class="card-top">
+            <div>
+              <div class="card-client">{{ handover.courier.full_name }}</div>
+              <div class="subtle">{{ handover.created_at|ru_datetime }}</div>
+            </div>
+            <span class="status {{ handover_status_class(handover.status) }}">{{ handover_status_label(handover.status) }}</span>
+          </div>
+          <div class="card-grid">
+            <div>
+              <div class="meta-label">Период</div>
+              <div class="meta-value">
+                {{ handover.period_start|ru_date }}
+                {% if handover.period_end != handover.period_start %} - {{ handover.period_end|ru_date }}{% endif %}
+              </div>
+            </div>
+            <div>
+              <div class="meta-label">Сумма</div>
+              <div class="meta-value amount">{{ handover.amount|money }}</div>
+            </div>
+            <div>
+              <div class="meta-label">Отправил</div>
+              <div class="meta-value">{{ handover.created_by.full_name if handover.created_by else "Система" }}</div>
+            </div>
+            <div>
+              <div class="meta-label">Обработал</div>
+              <div class="meta-value">{{ handover.confirmed_by.full_name if handover.confirmed_by else "Не обработано" }}</div>
+            </div>
+          </div>
+          {% if handover.status.value == "pending" %}
+            <div class="payment-card-actions">
+              <form class="payment-card-form" method="post" action="/accounting/handovers/{{ handover.id }}/confirm">
+                <input type="hidden" name="handover_status" value="{{ filters.handover_status }}">
+                <input type="hidden" name="courier_id" value="{{ filters.courier_id }}">
+                <input type="hidden" name="date_from" value="{{ filters.date_from }}">
+                <input type="hidden" name="date_to" value="{{ filters.date_to }}">
+                <input name="comment" placeholder="Комментарий" aria-label="Комментарий">
+                <button class="primary-btn" type="submit">Подтвердить</button>
+              </form>
+              <form class="payment-card-form" method="post" action="/accounting/handovers/{{ handover.id }}/reject">
+                <input type="hidden" name="handover_status" value="{{ filters.handover_status }}">
+                <input type="hidden" name="courier_id" value="{{ filters.courier_id }}">
+                <input type="hidden" name="date_from" value="{{ filters.date_from }}">
+                <input type="hidden" name="date_to" value="{{ filters.date_to }}">
+                <input name="comment" placeholder="Причина" aria-label="Причина отказа">
+                <button class="danger-btn" type="submit">Отклонить</button>
+              </form>
+            </div>
+          {% endif %}
+        </article>
+      {% endfor %}
+    </section>
+  {% else %}
+    <div class="empty-state handovers-empty">
+      <div class="empty-state-mark">0</div>
+      {% if filters.handover_status == "pending" or not filters.handover_status %}
+        <h2>Нет сдач на подтверждение</h2>
+        <p>Когда курьер отправит сумму «Выдано», она появится здесь для проверки.</p>
+      {% else %}
+        <h2>Истории сдач пока нет</h2>
+        <p>По выбранным фильтрам записей нет. Можно сбросить фильтры и посмотреть весь список.</p>
+      {% endif %}
+      {% if filters.handover_status or filters.courier_id or filters.date_from or filters.date_to %}
+        <a class="secondary-btn" href="/accounting/handovers">Сбросить фильтры</a>
+      {% endif %}
+    </div>
+  {% endif %}
+</section>
+{% endblock %}
